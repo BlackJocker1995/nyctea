@@ -1,0 +1,114 @@
+{
+  "MC_ROLL_P": {
+    "range": [
+      0.0,
+      12.0
+    ],
+    "step": 0.1,
+    "default": 6.5
+  },
+  "MC_PITCH_P": {
+    "range": [
+      0.0,
+      12.0
+    ],
+    "step": 0.1,
+    "default": 6.5
+  },
+  "MC_YAW_P": {
+    "range": [
+      0.0,
+      5.0
+    ],
+    "step": 0.1,
+    "default": 2.8
+  },
+  "MC_YAW_WEIGHT": {
+    "range": [
+      0.0,
+      1.0
+    ],
+    "step": 0.1,
+    "default": 0.4
+  },
+  "MPC_XY_P": {
+    "range": [
+      0.0,
+      2.0
+    ],
+    "step": 0.1,
+    "default": 0.95
+  },
+  "MPC_Z_P": {
+    "range": [
+      0.0,
+      1.5
+    ],
+    "step": 0.1,
+    "default": 1.0
+  },
+  "MC_PITCHRATE_P": {
+    "range": [
+      0.01,
+      0.6
+    ],
+    "step": 0.01,
+    "default": 0.15
+  },
+  "MC_ROLLRATE_P": {
+    "range": [
+      0.01,
+      0.5
+    ],
+    "step": 0.01,
+    "default": 0.15
+  },
+  "MC_YAWRATE_P": {
+    "range": [
+      0.0,
+      0.6
+    ],
+    "step": 0.01,
+    "default": 0.2
+  },
+  "MPC_TILTMAX_AIR": {
+    "range": [
+      20.0,
+      89.0
+    ],
+    "step": 1,
+    "default": 45.0
+  },
+  "MIS_YAW_ERR": {
+    "range": [
+      0.0,
+      90.0
+    ],
+    "step": 1,
+    "default": 12.0
+  },
+  "MPC_Z_VEL_MAX_DN": {
+    "range": [
+      0.5,
+      4.0
+    ],
+    "step": 0.1,
+    "default": 1.5
+  },
+  "MPC_Z_VEL_MAX_UP": {
+    "range": [
+      0.5,
+      8.0
+    ],
+    "step": 0.1,
+    "default": 3.0
+  },
+  "MPC_TKO_SPEED": {
+    "range": [
+      1.0,
+      5.0
+    ],
+    "step": 0.1,
+    "default": 1.5
+  }
+}
