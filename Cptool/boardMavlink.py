@@ -571,6 +571,7 @@ class BoardMavlinkPX4(BoardMavlink):
                     logging.debug("Reading status failure, try again.")
                     continue
                 # send this message
+                # print(status_data.shape, round(time_last / 1000000, 1))
                 self.data_segments.put([status_data, round(time_last / 1000000, 1)])
             except Exception as e:
                 logging.warning(f"{e}, then continue looping")

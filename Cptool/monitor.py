@@ -112,7 +112,7 @@ class MonitorFlight(multiprocessing.Process):
                     elif "Potential Thrust Loss" in line:
                         result = 'Thrust Loss'
                         break
-                    elif "PreArm" in line or "speed has been constrained by max speed" in line:
+                    elif "PreArm" in line:# or "speed has been constrained by max speed" in line:
                         result = 'PreArm Failed'
                         break
 

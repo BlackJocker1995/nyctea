@@ -140,7 +140,7 @@ class DroneMavlink:
         if not self._master:
             raise ValueError('Connect at first!')
         self._master.param_set_send(param, value)
-        self.get_param(param)
+        # self.get_param(param)
 
     def set_params(self, params_dict: dict) -> None:
         """
