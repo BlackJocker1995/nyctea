@@ -140,7 +140,7 @@ class DroneMavlink:
         if not self._master:
             raise ValueError('Connect at first!')
         self._master.param_set_send(param, value)
-        # self.get_param(param)
+        self.get_param(param)
 
     def set_params(self, params_dict: dict) -> None:
         """
@@ -292,9 +292,13 @@ class DroneMavlink:
         while True:
             time.sleep(0.1)
             mission_current = self.get_msg(["MISSION_CURRENT"])
+            # print(mission_current)
             if mission_current is not None and int(mission_current.seq) == waypoint:
                 break
         return True
+
+    def get_connection(self):
+        return self._master
 
     """
     Static method

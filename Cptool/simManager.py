@@ -12,7 +12,7 @@ import pexpect
 from pexpect import spawn
 from pymavlink import mavwp
 
-from Cptool.boardMavlink import BoardMavlink, BoardMavlinkAPM
+from Cptool.boardMavlink import BoardMavlink, BoardMavlinkAPM, BoardMavlinkPX4
 from Cptool.config import toolConfig
 from Cptool.mavlink import DroneMavlink
 from Cptool.mavtool import Location
@@ -148,10 +148,10 @@ class SimManager:
         :return:
         """
         if toolConfig.MODE == 'Ardupilot':
-            if os.path.exists(f"{toolConfig.ARDUPILOT_LOG_PATH}/eeprom.bin"):
-                os.remove(f"{toolConfig.ARDUPILOT_LOG_PATH}/eeprom.bin")
-            if os.path.exists(f"{toolConfig.ARDUPILOT_LOG_PATH}/mav.parm"):
-                os.remove(f"{toolConfig.ARDUPILOT_LOG_PATH}/mav.parm")
+            if os.path.exists(f"{toolConfig.ARDUPILOT_LOG_PATH}/drone{drone_i}/eeprom.bin"):
+                os.remove(f"{toolConfig.ARDUPILOT_LOG_PATH}/drone{drone_i}/eeprom.bin")
+            if os.path.exists(f"{toolConfig.ARDUPILOT_LOG_PATH}/drone{drone_i}/mav.parm"):
+                os.remove(f"{toolConfig.ARDUPILOT_LOG_PATH}/drone{drone_i}/mav.parm")
 
             if toolConfig.HOME is not None:
                 cmd = f"python3 {toolConfig.SITL_PATH} --location={toolConfig.HOME} " \
@@ -162,9 +162,10 @@ class SimManager:
                       f"--out=127.0.0.1:1455{drone_i} --out=127.0.0.1:1454{drone_i} --out=127.0.0.1:1456{drone_i} " \
                       f"-v ArduCopter -w -S {toolConfig.SPEED} --instance {drone_i}"
 
-            self._sitl_task = (pexpect.spawn(cmd, cwd=toolConfig.ARDUPILOT_LOG_PATH, timeout=30, encoding='utf-8'))
+            self._sitl_task = (pexpect.spawn(cmd, cwd=f"{toolConfig.ARDUPILOT_LOG_PATH}/drone{drone_i}",
+                                             timeout=30, encoding='utf-8'))
 
-        if toolConfig.MODE == toolConfig.MODE == 'PX4':
+        if toolConfig.MODE == 'PX4':
 
             if os.path.exists(
                     f"{toolConfig.PX4_RUN_PATH}/build/px4_sitl_default/instance_{drone_i}/eeprom/parameters_10016") \
@@ -218,7 +219,7 @@ class SimManager:
         onboard message manager
         """
         if toolConfig.MODE == "PX4":
-            pass
+            self.board_mavlink = BoardMavlinkPX4()
         else:
             self.board_mavlink = BoardMavlinkAPM()
 
@@ -276,7 +277,6 @@ class SimManager:
                 break
         self._sitl_task.close(force=True)
         logging.info('Stop SITL task.')
-        logging.debug('Send mavclosed to Airsim.')
 
     def stop_sim(self):
         self._sim_task.sendcontrol('c')

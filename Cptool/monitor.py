@@ -5,6 +5,7 @@ import os
 import time
 from abc import abstractmethod, ABC
 
+import pymavlink
 from pymavlink import mavwp, mavutil
 
 from Cptool.config import toolConfig
@@ -12,11 +13,17 @@ from Cptool.mavtool import Location
 
 
 class MonitorFlight(multiprocessing.Process):
-    def __init__(self, port):
+    def __init__(self, arg):
         super().__init__()
         self.msg_queue = multiprocessing.Queue()
-        self.master = mavutil.mavlink_connection('udp:0.0.0.0:{}'.format(port))
+        # port
+        # if isinstance(arg, int):
+        self.master = mavutil.mavlink_connection('udp:0.0.0.0:{}'.format(arg))
         self.master.wait_heartbeat(timeout=30)
+        # if isinstance(arg, pymavlink.mavutil.mavudp):
+        #     self.master = arg
+        # else:
+        #     raise TypeError(f"Not supported type: {type(arg)}")
 
     def get_msg(self, msg_type, block=False):
         """
@@ -172,7 +179,7 @@ class MonitorFlight(multiprocessing.Process):
                     # Is deviation ?
                     # logging.debug(f"Point2line distance {deviation_dis}.")
                     if deviation_dis > 10:
-                        logging.debug(f"Deviation {deviation_dis}, num++, num now - {deviation_num}.")
+                        logging.debug(f"Deviation {round(deviation_dis, 4)}, num++, num now - {deviation_num}.")
                         deviation_num += 1
                     else:
                         deviation_num = 0

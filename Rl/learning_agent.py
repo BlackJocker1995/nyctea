@@ -78,11 +78,11 @@ class ReLearningAgent():
         return self.sub_value_range[:, 0] + step_increase
 
     @abstractmethod
-    def save_point(self, filepath):
+    def save_point(self):
         pass
 
     @abstractmethod
-    def check_point(self, filepath):
+    def check_point(self):
         pass
 
 
@@ -156,6 +156,7 @@ class DDPGAgent(ReLearningAgent):
         self.buffer.append(transition)
 
     def _load_and_put(self, *transition):
+        logging.debug("Load buffer and put transition")
         if toolConfig.MODE == "PX4":
             pathfile = f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl"
         else:
@@ -194,7 +195,7 @@ class DDPGAgent(ReLearningAgent):
         self.buffer = self.load_buffer()
         # return if buffer is too small
         if len(self.buffer) < self.batch_size:
-            return
+            return False
 
         logging.info(f"Take example and learn, example/buffer size: {self.batch_size}/{len(self.buffer)}.")
         # take a sample
@@ -238,17 +239,22 @@ class DDPGAgent(ReLearningAgent):
         actor_learn()
         soft_update(self.critic_target, self.critic, self.tau)
         soft_update(self.actor_target, self.actor, self.tau)
+        return True
 
     def save_point(self, ext=None):
-        # while not os.access(f"{filepath}/actor.pth", os.W_OK):
-        #     time.sleep(0.1)
-        #     continue
         if toolConfig.MODE == "PX4":
             filepath = "model/PX4"
         else:
             filepath = "model/Ardupilot"
 
         if self.device == 0:
+            if os.path.exists(f"{filepath}/actor.pth"):
+                while not (os.access(f"{filepath}/actor.pth", os.W_OK) and
+                           os.access(f"{filepath}/critic.pth", os.W_OK) and
+                           os.access(f"{filepath}/actor_target.pth", os.W_OK) and
+                           os.access(f"{filepath}/critic_target.pth", os.W_OK)
+                ):
+                    continue
             torch.save(self.actor, f"{filepath}/actor.pth")
             torch.save(self.critic, f"{filepath}/critic.pth")
             torch.save(self.actor_target, f"{filepath}/actor_target.pth")
@@ -267,6 +273,12 @@ class DDPGAgent(ReLearningAgent):
         else:
             filepath = "model/Ardupilot"
         if os.path.exists(f"{filepath}/actor.pth"):
+            while not (os.access(f"{filepath}/actor.pth", os.R_OK) and
+                       os.access(f"{filepath}/critic.pth", os.R_OK) and
+                       os.access(f"{filepath}/actor_target.pth", os.R_OK) and
+                       os.access(f"{filepath}/critic_target.pth", os.R_OK)):
+                continue
+
             self.actor = torch.load(f"{filepath}/actor.pth")
             self.critic = torch.load(f"{filepath}/critic.pth")
             self.actor_target = torch.load(f"{filepath}/actor_target.pth")
@@ -284,15 +296,17 @@ class DDPGAgent(ReLearningAgent):
                 self.env.reset()
 
                 previous_deviation = 0
-                for i in range(50):
-                    time.sleep(1)
+                for i in range(80):
                     # monitor report error
                     if not self.env.manager.mav_monitor.msg_queue.empty():
-                        self.env.manager.mav_monitor.msg_queue.get()
+                        self.env.manager.mav_monitor.msg_queue.get(block=True)
                         break
 
                     # observe
                     cur_state = self.env.catch_state()
+                    if cur_state is None:
+                        # Not catch a state
+                        continue
                     logging.info(f"Observation deviation {self.env.cur_deviation}")
                     # break
                     if previous_deviation == self.env.cur_deviation:
@@ -300,7 +314,7 @@ class DDPGAgent(ReLearningAgent):
                     previous_deviation = self.env.cur_deviation
                     # check threshold
                     if self.env.cur_deviation < self.env.deviation_threshold:
-                        logging.debug(f"Deviation {self.env.cur_deviation} is small, no need to action.")
+                        logging.debug(f"Deviation {round(self.env.cur_deviation, 4)} is small, no need to action.")
                         # else keep flight
                         continue
 
@@ -320,9 +334,11 @@ class DDPGAgent(ReLearningAgent):
 
                     # only device 0 is learning other device provides buffer
                     if int(self.device) == 0:
-                        self.learn()
+                        if not self.learn():
+                            continue
+
                         if self.buffer_length % 100 < 7:
-                            self.save_point(ext=(self.buffer_length//100) * 100)
+                            self.save_point(ext=(self.buffer_length // 100) * 100)
                         else:
                             self.save_point()
 
@@ -334,31 +350,3 @@ class DDPGAgent(ReLearningAgent):
             #     # self.save_point()
             #     # send_notice(self.device, self.buffer_length, e)
             #     exit(-1)
-
-    def online_bin_monitor_rl(self):
-        self.check_point()
-        action_num = 0
-        while True:
-            try:
-                time.sleep(1)
-                if not self.env.manager.online_mavlink.recv_msg_queue.empty():
-                    # receive error result
-                    manager_msg, _ = self.env.manager.online_mavlink.recv_msg_queue.get()
-                    # print("receive message")
-                    return manager_msg, action_num
-
-                cur_state = self.env.catch_state()
-                logging.info(f"Observation deviation {self.env.cur_deviation}")
-                #
-                if self.env.cur_deviation > self.env.deviation_threshold:
-                    logging.info(f"Deviation {self.env.cur_deviation} detect.")
-                    action_0 = self.select_action(cur_state)
-                    action_0 = self.action2range(action_0)
-                    configuration = pd.DataFrame(action_0.reshape((-1, self.env.parameter_shape)),
-                                                 columns=toolConfig.PARAM).iloc[0].to_dict()
-                    # print(configuration)
-                    self.env.manager.online_mavlink.set_params(configuration)
-                    action_num += 1
-                    time.sleep(2)
-            except Exception as e:
-                print(e)

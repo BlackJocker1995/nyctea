@@ -38,7 +38,6 @@ class DroneEnv:
         #
         self.cur_deviation = None
         self.cur_state = None
-        self.configuration = None
         self.current_incorrect_configuration = None
         # display debug information
         self.debug = debug
@@ -97,36 +96,8 @@ class DroneEnv:
             deviation = np.radians(desired_state.values - achieved_state.values)
         # observed deviation
         deviation = abs(deviation.sum())
-        out_state = out_state.drop(toolConfig.PARAM, axis=1)
+
         return out_state, deviation
-
-    def start_simulation_env(self):
-        self.manager.start_multiple_sitl(self.device)
-        if toolConfig.MODE == "PX4":
-            self.manager.start_multiple_sim(self.device)
-            self.manager.online_mavlink_init(MavlinkPX4, self.device)
-            mission_file = 'Cptool/fitCollection_px4.txt'
-        else:
-            self.manager.online_mavlink_init(MavlinkAPM, self.device)
-            mission_file = 'Cptool/fitCollection.txt'
-        self.manager.mav_monitor_init(int(14560)+int(self.device))
-        self.manager.online_mavlink.set_mission(mission_file, False)
-
-        # PX4 requires waiting 2 seconds.
-        if toolConfig.MODE == "PX4":
-            time.sleep(2)
-        # take off
-        self.manager.online_mavlink.start_mission()
-        # load bin log file
-        self.manager.board_mavlink_init()
-        self.manager.board_mavlink.init_binary_log_file()
-        # Bin manager
-        self.manager.board_mavlink.wait_bin_ready()
-
-        # monitor error
-        self.manager.mav_monitor.start()
-        # wait flight
-        self.manager.online_mavlink.wait_waypoint()
 
     def reset(self, delay=True):
         """
@@ -139,11 +110,41 @@ class DroneEnv:
             self.manager.stop_sitl()
             if toolConfig.MODE == "PX4":
                 self.manager.stop_sim()
-                if os.path.exists(self.manager.online_mavlink.log_file_path):
-                    os.remove(self.manager.online_mavlink.log_file_path)
+            self.manager.board_mavlink.delete_current_log(self.device)
+            time.sleep(0.1)
         # Manager
         self.manager = FixSimManager(self.debug)
-        self.start_simulation_env()
+
+        # init environment
+        self.manager.start_multiple_sitl(self.device)
+        if toolConfig.MODE == "PX4":
+            self.manager.start_multiple_sim(self.device)
+            self.manager.online_mavlink_init(MavlinkPX4, self.device)
+            mission_file = 'Cptool/fitCollection_px4.txt'
+            self.manager.mav_monitor_init(int(14550) + int(self.device))
+        else:
+            self.manager.online_mavlink_init(MavlinkAPM, self.device)
+            mission_file = 'Cptool/fitCollection.txt'
+            self.manager.mav_monitor_init(int(14560) + int(self.device))
+        self.manager.board_mavlink_init()
+
+        # Set mission_ file
+        self.manager.online_mavlink.set_mission(mission_file, False)
+
+        # PX4 requires waiting 2 seconds.
+        if toolConfig.MODE == "PX4":
+            time.sleep(2)
+        # take off
+        self.manager.online_mavlink.start_mission()
+        # load bin log file
+        self.manager.board_mavlink.init_binary_log_file(self.device)
+        # Bin manager
+        self.manager.board_mavlink.wait_bin_ready()
+
+        # monitor error
+        self.manager.mav_monitor.start()
+        # wait flight
+        self.manager.online_mavlink.wait_waypoint()
         # wait to play game
         if delay:
             x = random.randint(0, 3)
@@ -157,10 +158,10 @@ class DroneEnv:
 
         # catch a state segment
         df_array = self.manager.board_mavlink.bin_read_last_seg()
+        if df_array is None:
+            return None
         # current state
         self.cur_state, self.cur_deviation = self.get_deviation(df_array)
-
-        self.configuration = df_array[toolConfig.PARAM_PART].iloc[0].to_numpy()
 
         return self.cur_state.to_numpy().reshape(-1)
 
@@ -216,7 +217,9 @@ class DroneEnv:
                 reward = reward * 2
                 finish = True
 
-        logging.info(f"Change Deviation: {self.cur_deviation} -> {played_deviation}: reward: {reward}, done: {finish}")
+        logging.info(f"Change Deviation: {round(self.cur_deviation, 4)} -> {round(played_deviation, 4)}: reward: "
+                     f"{round(reward, 4)}, done: {finish}")
+
         self.cur_state = next_state
         self.cur_deviation = played_deviation
         return next_state.to_numpy().reshape(-1), reward, finish
