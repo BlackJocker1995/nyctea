@@ -155,36 +155,56 @@ class DDPGAgent(ReLearningAgent):
             self.buffer.pop(0)
         self.buffer.append(transition)
 
-    def _load_and_put(self, *transition):
+    @classmethod
+    def save_once_buffer(cls, *transition):
         logging.debug("Load buffer and put transition")
         if toolConfig.MODE == "PX4":
             pathfile = f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl"
         else:
             pathfile = f"{toolConfig.BUFFER_PATH}/Ardupilot/buffer.pkl"
-        _buffer = []
+
         # read local buffer file
         if os.path.exists(pathfile):
-            with open(pathfile, "rb") as fp:
-                _buffer = pickle.load(fp)
-        # If over buffer size
-        if len(_buffer) == self.capacity:
-            _buffer.pop(0)
-        _buffer.append(transition)
-        self.buffer_length = len(_buffer)
-        # Save to local
-        while os.path.exists(pathfile) and not os.access(pathfile, os.W_OK):
-            continue
-        with open(pathfile, "wb") as fp:
-            pickle.dump(_buffer, fp)
-
-    @staticmethod
-    def load_buffer():
-        if toolConfig.MODE == "PX4":
-            with open(f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl", "rb") as fp:
-                return pickle.load(fp)
+            while os.path.exists(pathfile) and not os.access(pathfile, os.W_OK):
+                continue
+            with open(pathfile, "ab+") as fp:
+                pik_data = pickle.dumps(transition)
+                fp.write(pik_data)
+                fp.write(b";;")
         else:
-            with open(f"{toolConfig.BUFFER_PATH}/Ardupilot/buffer.pkl", "rb") as fp:
-                return pickle.load(fp)
+            with open(pathfile, "wb+") as fp:
+                pik_data = pickle.dumps(transition)
+                fp.write(pik_data)
+                fp.write(b";;")
+        #     with open(pathfile, "rb") as fp:
+        #         _buffer = pickle.load(fp)
+        # # If over buffer size
+        # if len(_buffer) == self.capacity:
+        #     _buffer.pop(0)
+        # _buffer.append(transition)
+        # self.buffer_length = len(_buffer)
+        # # Save to local
+        # while os.path.exists(pathfile) and not os.access(pathfile, os.W_OK):
+        #     continue
+        # with open(pathfile, "wb") as fp:
+        #     pickle.dump(_buffer, fp)
+
+    @classmethod
+    def load_buffer(cls):
+        raw_datas = []
+        if toolConfig.MODE == "PX4":
+            pathfile = f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl"
+        else:
+            pathfile = f"{toolConfig.BUFFER_PATH}/Ardupilot/buffer.pkl"
+        while os.path.exists(pathfile) and not os.access(pathfile, os.R_OK):
+            continue
+        with open(pathfile, "rb") as fp:
+            tmp_obj = fp.read()
+        tmp_obj_array = tmp_obj.split(b";;")
+        for item in tmp_obj_array:
+            if len(item) != 0:
+                raw_datas.append(pickle.loads(item))
+        return raw_datas
 
     def learn(self):
         """
@@ -330,7 +350,7 @@ class DDPGAgent(ReLearningAgent):
                         self.save_point()
                         break
                     # state - action save to buffer
-                    self._load_and_put(cur_state, action_0, reward, obe_state)
+                    self.save_once_buffer(cur_state, action_0, reward, obe_state)
 
                     # only device 0 is learning other device provides buffer
                     if int(self.device) == 0:
@@ -345,8 +365,8 @@ class DDPGAgent(ReLearningAgent):
             except KeyboardInterrupt:
                 self.save_point()
                 return
-            # except Exception as e:
-            #     logging.info(f"Exception: {e}, and save model")
-            #     # self.save_point()
-            #     # send_notice(self.device, self.buffer_length, e)
-            #     exit(-1)
+            except Exception as e:
+                logging.info(f"Exception: {e}, and save model")
+                # self.save_point()
+                send_notice(self.device, self.buffer_length, e)
+                exit(-1)

@@ -2,9 +2,9 @@
 This is an approach source code of Nyctea.
 
 ## Requirement
-Python package requirement: numpy ; pandas ; pymavlink ; pyulog ; keras ; tensorflow
+Python package requirement: numpy ; pandas ; pymavlink ; pyulog ; pytorch
 
-OS: The program is only test in Ubuntu 18.04 and 20.04 (recommend).
+OS: The program is only tested in Ubuntu 18.04 and 20.04 (recommend).
 
 `
 pip3 install pymavlink pandas pyulog eventlet keras tensorflow

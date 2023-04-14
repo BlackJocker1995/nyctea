@@ -7,8 +7,6 @@ import torch
 from Cptool.config import toolConfig
 from Rl.learning_agent import DDPGAgent
 
-
-
 if __name__ == "__main__":
     toolConfig.select_mode("PX4")
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"

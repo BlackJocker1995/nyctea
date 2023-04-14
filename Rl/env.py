@@ -29,8 +29,9 @@ class DroneEnv:
         self.tail_n = tail_n
         # deviation threshold
         if toolConfig.MODE == "PX4":
-            self.deviation_threshold = 2.5
+            self.deviation_threshold = 6.1
         else:
+            # 12.25
             self.deviation_threshold = 5
         # parameter_shape
         self.parameter_shape = len(toolConfig.PARAM)

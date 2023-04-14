@@ -17,7 +17,7 @@ from pyulog import ULog
 from tqdm import tqdm
 
 from Cptool.config import toolConfig
-from Cptool.mavtool import load_param, StackBuffer
+from Cptool.mavtool import load_param, StackBuffer, read_path_specified_file
 from collections import deque
 
 
@@ -48,69 +48,52 @@ class BoardMavlink(multiprocessing.Process):
         except TimeoutError:
             return None
 
-    @abstractmethod
-    def run(self):
-        pass
-
-    @abstractmethod
-    def extract_log_file(self, log_file, keep_des=False):
-        pass
-
-    @abstractmethod
-    def fill_and_process_pd_log(self, pd_array: pd.DataFrame):
-        pass
-
-    @abstractmethod
-    def init_binary_log_file(self, device_i=None):
-        pass
-
-    @abstractmethod
-    def delete_current_log(self, device=None):
-        pass
-
     def delete_tmp_log(self):
         if os.path.exists(self.log_file_path):
             os.remove(self.log_file_path)
 
-    """
-    Static Method
-    """
-
-    @staticmethod
-    def extract_log_file_des_and_ach(log_file):
+    @classmethod
+    def extract_log_path(cls, log_path, skip=True, keep_des=False, thread=None):
         """
-        extract log message form a bin file with att desired and achieved
-        :param log_file:
+        extract and convert bin file to csv
+        :param log_path: file path.
+        :param skip: skip process if the csv is existing.
+        :param keep_des: extract the desired state from logs.
+        :param thread: multiple threat, if none will not start thread
         :return:
         """
+        # If px4, the log is ulg, if Ardupilot the log is bin
+        end_flag = 'ulg' if (toolConfig.MODE == "PX4") else 'BIN'
+        file_list = read_path_specified_file(log_path, end_flag)
+        if not os.path.exists(f"{log_path}/csv"):
+            os.makedirs(f"{log_path}/csv")
 
-        logs = mavutil.mavlink_connection(log_file)
-        # init
-        out_data = []
+        # multiple
+        if thread is not None:
+            arrays = np.array_split(file_list, thread)
+            threat_manage = []
+            ray.init(include_dashboard=True, dashboard_host="127.0.0.1", dashboard_port=8088)
 
-        while True:
-            msg = logs.recv_match(type=["ATT"])
-            if msg is None:
-                break
-            out = {
-                'TimeS': msg.TimeUS / 1000000,
-                'Roll': msg.Roll,
-                'DesRoll': msg.DesRoll,
-                'Pitch': msg.Pitch,
-                'DesPitch': msg.DesPitch,
-                'Yaw': msg.Yaw,
-                'DesYaw': msg.DesYaw
-            }
-            out_data.append(out)
+            for array in arrays:
+                threat_manage.append(cls.extract_log_path_threat.remote(cls, log_path, array,
+                                                                        keep_des, skip))
+            ray.get(threat_manage)
+            ray.shutdown()
+        else:
+            cls.extract_log_path_threat(cls, log_path, file_list, keep_des, skip)
 
-        pd_array = pd.DataFrame(out_data)
-        # Switch sequence, fill,  and return
-        pd_array['TimeS'] = pd_array['TimeS'].round(1)
-        pd_array = pd_array.drop_duplicates(keep='first')
-        return pd_array
+    @abstractmethod
+    def run(self):
+        pass
 
+    @classmethod
+    @abstractmethod
+    def extract_log_file(cls, log_file, keep_des=False):
+        pass
+
+    @classmethod
     @ray.remote
-    def extract_log_path_threat(self, log_path, file_list, keep_des, skip):
+    def extract_log_path_threat(cls, log_path, file_list, keep_des, skip):
         """
         threat method to extract data from log.
         :param log_path:
@@ -124,12 +107,28 @@ class BoardMavlink(multiprocessing.Process):
             if skip and os.path.exists(f'{log_path}/csv/{name}.csv'):
                 continue
             try:
-                csv_data = self.extract_log_file(log_path + f'/{file}', keep_des)
+                csv_data = cls.extract_log_file(f'{log_path}/{file}', keep_des)
                 csv_data.to_csv(f'{log_path}/csv/{name}.csv', index=False)
             except Exception as e:
                 logging.warning(f"Error processing {file} : {e}")
                 continue
         return True
+
+    @abstractmethod
+    def fill_and_process_pd_log(self, pd_array: pd.DataFrame):
+        pass
+
+    @abstractmethod
+    def init_binary_log_file(self, device_i=None):
+        pass
+
+    @abstractmethod
+    def delete_current_log(self, device=None):
+        pass
+
+    """
+    Static Method
+    """
 
     @staticmethod
     def _fill_and_process_public(pd_array: pd.DataFrame):
@@ -187,57 +186,6 @@ class BoardMavlinkAPM(BoardMavlink):
             if os.path.exists(self.log_file_path):
                 break
 
-    def extract_log_file(self, log_file, keep_des=False):
-        """
-        extract log message form a bin file.
-        :param keep_des:
-        :param log_file:
-        :return:
-        """
-        accept_item = toolConfig.LOG_MAP
-
-        logs = mavutil.mavlink_connection(log_file)
-        # init
-        out_data = []
-        accept_param = load_param().columns.to_list()
-
-        while True:
-            msg = logs.recv_match(type=accept_item)
-            if msg is None:
-                break
-            # Skip if not index 0 sensor
-            # SKip is param is not we want
-            if (hasattr(msg, "I") and msg.I != 0) or \
-                    (hasattr(msg, "IMU") and msg.IMU != 0) or \
-                    (msg.get_type() == 'PARM' and msg.Name not in accept_param):
-                continue
-            # Otherwise Record
-            out_data.append(self.log_extract_apm(msg, keep_des))
-        pd_array = pd.DataFrame(out_data)
-        # Switch sequence, fill,  and return
-        pd_array = self.fill_and_process_pd_log(pd_array)
-        return pd_array
-
-    def fill_and_process_pd_log(self, pd_array: pd.DataFrame):
-        """
-        pre-process the data collected.
-        :param pd_array:
-        :return:
-        """
-        # Remain timestamp .1 and drop duplicate
-        pd_array['TimeS'] = pd_array['TimeS'].round(1)
-        df_array = self._fill_and_process_public(pd_array)
-        # Sort
-        df_array = self._order_sort(df_array)
-        return df_array
-
-    def get_time_index_bin(self, msg):
-        """
-        As different message have different time unit. It needs to convert to same second unit.
-        :return:
-        """
-        return msg.TimeUS / 1000000
-
     def read_status_patch_bin(self, time_last):
         out_data = []
         accept_item = toolConfig.LOG_MAP.copy()
@@ -276,6 +224,64 @@ class BoardMavlinkAPM(BoardMavlink):
             last_num = f"{int(num) - 1}"
             with open(log_index, 'w') as f:
                 f.write(last_num)
+
+    @classmethod
+    def extract_log_file(cls, log_file, keep_des=False):
+        """
+        extract log message form a bin file.
+        :param keep_des:
+        :param log_file:
+        :return:
+        """
+        accept_item = toolConfig.LOG_MAP
+
+        logs = mavutil.mavlink_connection(log_file)
+        # init
+        out_data = []
+        accept_param = load_param().columns.to_list()
+
+        while True:
+            msg = logs.recv_match(type=accept_item)
+            if msg is None:
+                break
+            # Skip if not index 0 sensor
+            # SKip is param is not we want
+            if (hasattr(msg, "I") and msg.I != 0) or \
+                    (hasattr(msg, "IMU") and msg.IMU != 0) or \
+                    (msg.get_type() == 'PARM' and msg.Name not in accept_param):
+                continue
+            # Otherwise Record
+            out_data.append(cls.log_extract_apm(msg, keep_des))
+        pd_array = pd.DataFrame(out_data)
+        # Switch sequence, fill,  and return
+        pd_array = cls.fill_and_process_pd_log(pd_array)
+        return pd_array
+
+    @classmethod
+    def fill_and_process_pd_log(cls, pd_array: pd.DataFrame):
+        """
+        pre-process the data collected.
+        :param pd_array:
+        :return:
+        """
+        # Remain timestamp .1 and drop duplicate
+        pd_array['TimeS'] = pd_array['TimeS'].round(1)
+        df_array = cls._fill_and_process_public(pd_array)
+        # Sort
+        df_array = cls._order_sort(df_array)
+        return df_array
+
+    """
+    Static Method
+    """
+
+    @staticmethod
+    def get_time_index_bin(msg):
+        """
+        As different message have different time unit. It needs to convert to same second unit.
+        :return:
+        """
+        return msg.TimeUS / 1000000
 
     @staticmethod
     def log_extract_apm(msg: DFMessage, keep_des=False):
@@ -372,6 +378,10 @@ class BoardMavlinkAPM(BoardMavlink):
             }
         return out
 
+    """
+    background thread
+    """
+
     def run(self):
         time_last = 0
         # Wait for bin file created
@@ -411,68 +421,6 @@ class BoardMavlinkPX4(BoardMavlink):
     def __init__(self):
         super().__init__()
 
-    def fill_and_process_pd_log(self, pd_array: pd.DataFrame):
-        df_array = self._fill_and_process_public(pd_array)
-        return df_array
-
-    def extract_log_file(self, log_file, keep_des=False):
-        """
-        extract log message form a bin file.
-        :param log_file:
-        :return:
-        """
-
-        ulog = ULog(log_file)
-
-        if keep_des:
-            bias = pd.DataFrame(ulog.get_dataset('estimator_sensor_bias').data)[["timestamp", "accel_bias[0]",
-                                                                                 "accel_bias[1]", "accel_bias[2]"]]
-            bias.columns = ["TimeS", "BiasA", "BiasB", "BiasC"]
-
-        att = pd.DataFrame(ulog.get_dataset('vehicle_attitude_setpoint').data)[["timestamp",
-                                                                                "roll_body", "pitch_body", "yaw_body"]]
-        rate = pd.DataFrame(ulog.get_dataset('vehicle_rates_setpoint').data)[["timestamp",
-                                                                              "roll", "pitch", "yaw"]]
-        acc_gyr = pd.DataFrame(ulog.get_dataset('sensor_combined').data)[["timestamp",
-                                                                          "gyro_rad[0]", "gyro_rad[1]", "gyro_rad[2]",
-                                                                          "accelerometer_m_s2[0]",
-                                                                          "accelerometer_m_s2[1]",
-                                                                          "accelerometer_m_s2[2]"]]
-        mag = pd.DataFrame(ulog.get_dataset('sensor_mag').data)[["timestamp", "x", "y", "z"]]
-        vibe = pd.DataFrame(ulog.get_dataset('sensor_accel').data)[["timestamp", "x", "y", "z"]]
-        # Param
-        param = pd.Series(ulog.initial_parameters)
-        param = param[toolConfig.PARAM]
-        # select parameters
-        for t, name, value in ulog.changed_parameters:
-            if name in toolConfig.PARAM:
-                param[name] = round(value, 5)
-
-        att.columns = ["TimeS", "Roll", "Pitch", "Yaw"]
-        rate.columns = ["TimeS", "RateRoll", "RatePitch", "RateYaw"]
-        acc_gyr.columns = ["TimeS", "GyrX", "GyrY", "GyrZ", "AccX", "AccY", "AccZ"]
-        mag.columns = ["TimeS", "MagX", "MagY", "MagZ"]
-        vibe.columns = ["TimeS", "VibeX", "VibeY", "VibeZ"]
-        # Merge values
-        if keep_des:
-            pd_array = pd.concat([att, rate, acc_gyr, mag, vibe, bias]).sort_values(by='TimeS')
-        else:
-            pd_array = pd.concat([att, rate, acc_gyr, mag, vibe]).sort_values(by='TimeS')
-
-        # Process
-        df_array = self.fill_and_process_pd_log(pd_array)
-        # Add parameters
-        param_values = np.tile(param.values, df_array.shape[0]).reshape(df_array.shape[0], -1)
-        df_array[toolConfig.PARAM] = param_values
-
-        # Sort
-        order_name = toolConfig.STATUS_ORDER.copy()
-        param_seq = load_param().columns.to_list()
-        param_name = df_array.keys().difference(order_name).to_list()
-        param_name.sort(key=lambda item: param_seq.index(item))
-
-        return df_array
-
     def init_binary_log_file(self, device_i=None):
         if device_i is None:
             log_path = f"{toolConfig.PX4_LOG_PATH}/*.ulg"
@@ -501,7 +449,8 @@ class BoardMavlinkPX4(BoardMavlink):
         time_last = float(time_last)
 
         bias = pd.DataFrame(self.flight_log.get_dataset('estimator_sensor_bias').data)[["timestamp", "accel_bias[0]",
-                                                                             "accel_bias[1]", "accel_bias[2]"]]
+                                                                                        "accel_bias[1]",
+                                                                                        "accel_bias[2]"]]
         bias.columns = ["TimeS", "BiasA", "BiasB", "BiasC"]
         bias = bias[bias["TimeS"] > time_last]
 
@@ -548,6 +497,76 @@ class BoardMavlinkPX4(BoardMavlink):
     def delete_current_log(self, device=None):
         if os.path.exists(self.log_file_path):
             os.remove(self.log_file_path)
+
+    @classmethod
+    def fill_and_process_pd_log(cls, pd_array: pd.DataFrame):
+        df_array = cls._fill_and_process_public(pd_array)
+        return df_array
+
+    @classmethod
+    def extract_log_file(cls, log_file, keep_des=False):
+        """
+        extract log message form a bin file.
+        :param log_file:
+        :param keep_des:
+        :return:
+        """
+
+        ulog = ULog(log_file)
+
+        if keep_des:
+            bias = pd.DataFrame(ulog.get_dataset('estimator_sensor_bias').data)[["timestamp", "accel_bias[0]",
+                                                                                 "accel_bias[1]", "accel_bias[2]"]]
+            bias.columns = ["TimeS", "BiasA", "BiasB", "BiasC"]
+
+        att = pd.DataFrame(ulog.get_dataset('vehicle_attitude_setpoint').data)[["timestamp",
+                                                                                "roll_body", "pitch_body", "yaw_body"]]
+        rate = pd.DataFrame(ulog.get_dataset('vehicle_rates_setpoint').data)[["timestamp",
+                                                                              "roll", "pitch", "yaw"]]
+        acc_gyr = pd.DataFrame(ulog.get_dataset('sensor_combined').data)[["timestamp",
+                                                                          "gyro_rad[0]", "gyro_rad[1]", "gyro_rad[2]",
+                                                                          "accelerometer_m_s2[0]",
+                                                                          "accelerometer_m_s2[1]",
+                                                                          "accelerometer_m_s2[2]"]]
+        mag = pd.DataFrame(ulog.get_dataset('sensor_mag').data)[["timestamp", "x", "y", "z"]]
+        vibe = pd.DataFrame(ulog.get_dataset('sensor_accel').data)[["timestamp", "x", "y", "z"]]
+        # Param
+        param = pd.Series(ulog.initial_parameters)
+        param = param[toolConfig.PARAM]
+        # select parameters
+        for t, name, value in ulog.changed_parameters:
+            if name in toolConfig.PARAM:
+                param[name] = round(value, 5)
+
+        att.columns = ["TimeS", "Roll", "Pitch", "Yaw"]
+        rate.columns = ["TimeS", "RateRoll", "RatePitch", "RateYaw"]
+        acc_gyr.columns = ["TimeS", "GyrX", "GyrY", "GyrZ", "AccX", "AccY", "AccZ"]
+        mag.columns = ["TimeS", "MagX", "MagY", "MagZ"]
+        vibe.columns = ["TimeS", "VibeX", "VibeY", "VibeZ"]
+        # Merge values
+        if keep_des:
+            pd_array = pd.concat([att, rate, acc_gyr, mag, vibe, bias]).sort_values(by='TimeS')
+        else:
+            pd_array = pd.concat([att, rate, acc_gyr, mag, vibe]).sort_values(by='TimeS')
+
+        pd_array['TimeS'] = pd_array['TimeS'] / 1000000
+        # Process
+        df_array = cls.fill_and_process_pd_log(pd_array)
+        # Add parameters
+        param_values = np.tile(param.values, df_array.shape[0]).reshape(df_array.shape[0], -1)
+        df_array[toolConfig.PARAM] = param_values
+
+        # Sort
+        order_name = toolConfig.STATUS_ORDER.copy()
+        param_seq = load_param().columns.to_list()
+        param_name = df_array.keys().difference(order_name).to_list()
+        param_name.sort(key=lambda item: param_seq.index(item))
+
+        return df_array
+
+    """
+    background thread
+    """
 
     def run(self):
         logging.info("Start Bin monitor.")

@@ -292,4 +292,4 @@ def sort_result_detect_repair(result_time, detect_time, repair_time):
 def send_notice(thread, buffer_len, content):
     url = f"http://iyuu.cn/IYUU5945T5e031af7ab34a0248e4ed4318d9c126efd285bd0.send?text=" \
           f"Nyctea-{thread}错误&desp=Buffer-{buffer_len}-{content}"
-    response = requests.request("GET", url)
+    requests.request("GET", url)
