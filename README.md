@@ -51,6 +51,8 @@ export PX4_HOME_ALT=0.000000
 export PX4_SIM_SPEED_FACTOR=3 # speed
 ```
 
+3. To use the simulation without the jMAVSim GUI, please set the following environment variable `HEADLESS=1`
+
 ## Deployment
 The configuration is in `Cptool.config.py`.
 

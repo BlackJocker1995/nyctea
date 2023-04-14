@@ -235,7 +235,7 @@ class SimManager:
 
     def mav_monitor_connect(self):
         """
-        Mavlnik连接
+        Mavlnik 连接
         :return:
         """
         return self.online_mavlink.connect()

@@ -140,7 +140,6 @@ class ToolConfig:
                 param_name = pd.DataFrame(json.loads(f.read())).columns.tolist()
             self.__dict__["PARAM"] = param_name
 
-            # TODO: px4 data
             self.__dict__["PARAM_PART"] = [
                 "MC_ROLL_P",
                 "MC_PITCH_P",
