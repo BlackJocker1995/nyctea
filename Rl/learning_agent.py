@@ -1,3 +1,4 @@
+import fcntl
 import json
 import logging
 import os
@@ -168,14 +169,18 @@ class DDPGAgent(ReLearningAgent):
             while os.path.exists(pathfile) and not os.access(pathfile, os.W_OK):
                 continue
             with open(pathfile, "ab+") as fp:
+                fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 pik_data = pickle.dumps(transition)
                 fp.write(pik_data)
-                fp.write(b";;")
+                fp.write(b";;\n")
+                fcntl.flock(fp, fcntl.LOCK_UN)
         else:
             with open(pathfile, "wb+") as fp:
+                fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 pik_data = pickle.dumps(transition)
                 fp.write(pik_data)
-                fp.write(b";;")
+                fp.write(b";;\n")
+                fcntl.flock(fp, fcntl.LOCK_UN)
         #     with open(pathfile, "rb") as fp:
         #         _buffer = pickle.load(fp)
         # # If over buffer size
@@ -199,8 +204,11 @@ class DDPGAgent(ReLearningAgent):
         while os.path.exists(pathfile) and not os.access(pathfile, os.R_OK):
             continue
         with open(pathfile, "rb") as fp:
+            fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
             tmp_obj = fp.read()
-        tmp_obj_array = tmp_obj.split(b";;")
+            fcntl.flock(fp, fcntl.LOCK_UN)
+        # binary split
+        tmp_obj_array = tmp_obj.split(b";;\n")
         for item in tmp_obj_array:
             if len(item) != 0:
                 raw_datas.append(pickle.loads(item))
