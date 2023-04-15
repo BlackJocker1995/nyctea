@@ -86,7 +86,9 @@ class DroneMavlink:
 
         # if px4, set home at first
         if toolConfig.MODE == "PX4":
-            self.px4_set_home()
+            set_result = self.px4_set_home()
+            if not set_result:
+                return False
 
         if israndom:
             loader = self.random_mission(loader)
@@ -239,7 +241,10 @@ class DroneMavlink:
                                                -105.230575,
                                                0.000000)
         msg = self._master.recv_match(type=['COMMAND_ACK'], blocking=True, timeout=30)
+        if msg is None:
+            return False
         logging.debug(f"Home set callback: {msg.command}")
+        return True
 
     def gcs_msg_request(self):
         # If it requires manually send the gsc packets. (PX4)
@@ -339,7 +344,6 @@ class MavlinkAPM(DroneMavlink):
 
     def __init__(self, port, recv_msg_queue, send_msg_queue):
         super(MavlinkAPM, self).__init__(port, recv_msg_queue, send_msg_queue)
-
 
     """
     Thread

@@ -319,10 +319,13 @@ class DDPGAgent(ReLearningAgent):
 
                 logging.info("Change configuration.")
                 self.env.get_random_incorrent_configuration()
-                self.env.reset()
+                set_result = self.env.reset()
+                # reset fault, retry
+                if not set_result:
+                    continue
 
                 previous_deviation = 0
-                for i in range(80):
+                for _ in range(80):
                     # monitor report error
                     if not self.env.manager.mav_monitor.msg_queue.empty():
                         self.env.manager.mav_monitor.msg_queue.get(block=True)
