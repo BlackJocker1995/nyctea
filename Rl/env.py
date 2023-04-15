@@ -112,7 +112,7 @@ class DroneEnv:
             if toolConfig.MODE == "PX4":
                 self.manager.stop_sim()
             self.manager.board_mavlink.delete_current_log(self.device)
-            time.sleep(0.1)
+            time.sleep(1)
         # Manager
         self.manager = FixSimManager(self.debug)
 

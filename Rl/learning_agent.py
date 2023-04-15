@@ -64,7 +64,7 @@ class ReLearningAgent():
         out_values = np.random.random(len(toolConfig.PARAM))
         return out_values
 
-    def action2range(self, action):
+    def action2config(self, action):
         """
         output action is [0, 1], transform them to original range of parameters.
         @param action: configuration action
@@ -168,6 +168,7 @@ class DDPGAgent(ReLearningAgent):
                 fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 pik_data = pickle.dumps(transition)
                 fp.write(pik_data)
+                # line flag
                 fp.write(b";;\n")
                 fcntl.flock(fp, fcntl.LOCK_UN)
         else:
@@ -175,20 +176,9 @@ class DDPGAgent(ReLearningAgent):
                 fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 pik_data = pickle.dumps(transition)
                 fp.write(pik_data)
+                # line flag
                 fp.write(b";;\n")
                 fcntl.flock(fp, fcntl.LOCK_UN)
-        #     with open(pathfile, "rb") as fp:
-        #         _buffer = pickle.load(fp)
-        # # If over buffer size
-        # if len(_buffer) == self.capacity:
-        #     _buffer.pop(0)
-        # _buffer.append(transition)
-        # self.buffer_length = len(_buffer)
-        # # Save to local
-        # while os.path.exists(pathfile) and not os.access(pathfile, os.W_OK):
-        #     continue
-        # with open(pathfile, "wb") as fp:
-        #     pickle.dump(_buffer, fp)
 
     @classmethod
     def load_buffer(cls):
@@ -203,10 +193,10 @@ class DDPGAgent(ReLearningAgent):
             fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
             tmp_obj = fp.read()
             fcntl.flock(fp, fcntl.LOCK_UN)
-        # binary split
+        # binary split with flag b";;\n"
         tmp_obj_array = tmp_obj.split(b";;\n")
         for item in tmp_obj_array:
-            if len(item) != 0:
+            if len(item) > 10:
                 raw_datas.append(pickle.loads(item))
         return raw_datas
 
@@ -279,10 +269,22 @@ class DDPGAgent(ReLearningAgent):
                            os.access(f"{filepath}/critic_target.pth", os.W_OK)
                 ):
                     continue
-            torch.save(self.actor, f"{filepath}/actor.pth")
-            torch.save(self.critic, f"{filepath}/critic.pth")
-            torch.save(self.actor_target, f"{filepath}/actor_target.pth")
-            torch.save(self.critic_target, f"{filepath}/critic_target.pth")
+            with open(f"{filepath}/actor.pth", "wb") as fp1, \
+                    open(f"{filepath}/critic.pth", "wb") as fp2, \
+                    open(f"{filepath}/actor_target.pth", "wb") as fp3, \
+                    open(f"{filepath}/critic_target.pth", "wb") as fp4:
+                fcntl.flock(fp1, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp2, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp3, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp4, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                torch.save(self.actor, fp1)
+                torch.save(self.critic, fp2)
+                torch.save(self.actor_target, fp3)
+                torch.save(self.critic_target, fp4)
+                fcntl.flock(fp1, fcntl.LOCK_UN)
+                fcntl.flock(fp2, fcntl.LOCK_UN)
+                fcntl.flock(fp3, fcntl.LOCK_UN)
+                fcntl.flock(fp4, fcntl.LOCK_UN)
 
         if self.device == 0 and ext is not None:
             ext = int(ext)
@@ -332,7 +334,7 @@ class DDPGAgent(ReLearningAgent):
                         # Not catch a state
                         continue
                     logging.info(f"Observation deviation {self.env.cur_deviation}")
-                    # break
+                    # break if the deviation is not change
                     if previous_deviation == self.env.cur_deviation:
                         break
                     previous_deviation = self.env.cur_deviation
@@ -342,12 +344,13 @@ class DDPGAgent(ReLearningAgent):
                         # else keep flight
                         continue
 
-                    # only device 0 main model
+                    # other device should load model at first
                     if self.device != 0:
                         self.check_point()
                     # select action
                     action_0 = self.select_action(cur_state)
-                    action_0 = self.action2range(action_0)
+                    # translate the action to configuration
+                    action_0 = self.action2config(action_0)
                     obe_state, reward, done = self.env.step(action_0)
 
                     if done:
@@ -369,8 +372,8 @@ class DDPGAgent(ReLearningAgent):
             except KeyboardInterrupt:
                 self.save_point()
                 return
-            except Exception as e:
-                logging.info(f"Exception: {e}, and save model")
-                # self.save_point()
-                send_notice(self.device, self.buffer_length, e)
-                exit(-1)
+            # except Exception as e:
+            #     logging.info(f"Exception: {e}, and save model")
+            #     # self.save_point()
+            #     send_notice(self.device, self.buffer_length, e)
+            #     exit(-1)
