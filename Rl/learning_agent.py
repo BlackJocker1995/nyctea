@@ -6,10 +6,6 @@ import pickle
 import random
 import time
 from abc import abstractmethod
-from copy import deepcopy
-
-import random
-from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -19,8 +15,6 @@ import torch.nn as nn
 import torch.optim as optim
 
 from Rl.actor_critic import Actor, Critic
-
-tf.compat.v1.disable_eager_execution()
 
 from Cptool.config import toolConfig
 from Cptool.mavtool import load_param, select_sub_dict, read_unit_from_dict, get_default_values, read_range_from_dict, \
@@ -269,6 +263,7 @@ class DDPGAgent(ReLearningAgent):
                            os.access(f"{filepath}/critic_target.pth", os.W_OK)
                 ):
                     continue
+            # Lock the file and save the network model.
             with open(f"{filepath}/actor.pth", "wb") as fp1, \
                     open(f"{filepath}/critic.pth", "wb") as fp2, \
                     open(f"{filepath}/actor_target.pth", "wb") as fp3, \
@@ -340,12 +335,15 @@ class DDPGAgent(ReLearningAgent):
                     # break if the deviation is not change
                     if previous_deviation == self.env.cur_deviation:
                         break
+                    # update previous deviation
                     previous_deviation = self.env.cur_deviation
+
                     # check threshold
                     if self.env.cur_deviation < self.env.deviation_threshold:
                         logging.debug(f"Deviation {round(self.env.cur_deviation, 4)} is small, no need to action.")
                         # else keep flight
                         continue
+                    logging.info("Deviation over threshold, start repair.")
 
                     # other device should load model at first
                     if self.device != 0:
@@ -375,8 +373,11 @@ class DDPGAgent(ReLearningAgent):
             except KeyboardInterrupt:
                 self.save_point()
                 return
-            # except Exception as e:
-            #     logging.info(f"Exception: {e}, and save model")
-            #     # self.save_point()
-            #     send_notice(self.device, self.buffer_length, e)
-            #     exit(-1)
+            except Exception as e:
+                logging.info(f"Exception: {e}, and save model")
+                while True:
+                    time.sleep(0.1)
+                # logging.info(f"Exception: {e}, and save model")
+                # # self.save_point()
+                # send_notice(self.device, self.buffer_length, e)
+                # exit(-1)

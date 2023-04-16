@@ -39,13 +39,19 @@ class BoardMavlink(multiprocessing.Process):
     def bin_read_last_seg(self, tail_n: int = 20):
         try:
             with eventlet.Timeout(10, True):
+                # wait share queue.
                 while self.data_segments.empty():
                     time.sleep(0.1)
+            # capture a data
             states, timestamp = self.data_segments.get()
             pd_array = pd.DataFrame(states)
+            # only capture last tail_n vector
             pd_array = pd_array.tail(tail_n)
+
+            logging.debug("Return a captured segment.")
             return pd_array
         except TimeoutError:
+            logging.warning("Read segment timed out!")
             return None
 
     def delete_tmp_log(self):

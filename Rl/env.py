@@ -29,10 +29,10 @@ class DroneEnv:
         self.tail_n = tail_n
         # deviation threshold
         if toolConfig.MODE == "PX4":
-            self.deviation_threshold = 6.1
+            self.deviation_threshold = 2.3
         else:
             # 12.25
-            self.deviation_threshold = 5
+            self.deviation_threshold = 6.1
         # parameter_shape
         self.parameter_shape = len(toolConfig.PARAM)
 
@@ -106,12 +106,14 @@ class DroneEnv:
         """
         # if alive, close
         if self.manager is not None:
+            print(self.manager)
             self.manager.mav_monitor.terminate()
             self.manager.board_mavlink.terminate()
             self.manager.stop_sitl()
             if toolConfig.MODE == "PX4":
                 self.manager.stop_sim()
             self.manager.board_mavlink.delete_current_log(self.device)
+        logging.debug("Stop previous simulation successfully.")
 
         # Manager
         self.manager = FixSimManager(self.debug)
@@ -128,10 +130,12 @@ class DroneEnv:
             mission_file = 'Cptool/fitCollection.txt'
             self.manager.mav_monitor_init(int(14560) + int(self.device))
         self.manager.board_mavlink_init()
+        logging.debug("Start new simulation environment.")
 
         # Set mission_ file
         set_result = self.manager.online_mavlink.set_mission(mission_file, False)
         if not set_result:
+            logging.warning("Mission file set failed!")
             return False
 
         # PX4 requires waiting 2 seconds.
@@ -150,12 +154,19 @@ class DroneEnv:
         self.manager.online_mavlink.wait_waypoint()
         # wait to play game
         if delay:
-            x = random.randint(0, 3)
+            x = random.randint(0, 2)
             logging.info(f"Game play with {x} seconds later.")
             time.sleep(x)
         # set configuration
         self.manager.online_mavlink.set_params(self.current_incorrect_configuration)
+        # read check parameters
+        # self.manager.online_mavlink.get_params(toolConfig.PARAM_PART)
+
+        logging.debug("Set parameters successfully.")
+
         self.manager.board_mavlink.start()
+
+        return True
 
     def catch_state(self):
 
@@ -178,7 +189,10 @@ class DroneEnv:
         # Upload this configuration
         configuration = pd.DataFrame(configuration.reshape((-1, self.parameter_shape)),
                                      columns=toolConfig.PARAM).iloc[0].to_dict()
+        # set and read check
         self.manager.online_mavlink.set_params(configuration)
+        # self.manager.online_mavlink.get_params(toolConfig.PARAM_PART)
+
         # Wait a minimum
         if toolConfig.MODE == "Ardupilot":
             time.sleep(self.tail_n / 10)

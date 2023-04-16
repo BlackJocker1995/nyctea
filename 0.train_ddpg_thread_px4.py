@@ -25,5 +25,5 @@ if __name__ == '__main__':
 
     for i in range(thread):
         cmd = f'gnome-terminal --tab --working-directory={os.getcwd()} -e ' \
-              f'"python3 {os.getcwd()}/0.train_ddpg.py --device {i}"'
+              f'"python3 {os.getcwd()}/0.train_ddpg_px4.py --device {i}"'
         os.system(cmd)

@@ -4,8 +4,6 @@ import multiprocessing
 import os
 import time
 from abc import abstractmethod, ABC
-
-import pymavlink
 from pymavlink import mavwp, mavutil
 
 from Cptool.config import toolConfig
@@ -74,12 +72,10 @@ class MonitorFlight(multiprocessing.Process):
         # logger
         small_move_num = 0
         deviation_num = 0
-        low_lat_num = 0
         # Flag
         start_check = False
         current_mission = 0
         pre_alt = 0
-        last_time = 0
 
         start_time = time.time()
         while True:
@@ -92,6 +88,7 @@ class MonitorFlight(multiprocessing.Process):
             # System status message
             if status_message is not None and status_message.get_type() == "STATUSTEXT":
                 line = status_message.text
+                logging.debug(f"Status message: {status_message}")
                 # print(status_message)
                 if status_message.severity == 6:
                     if "Disarming" in line or "landed" in line or "Landing" in line or "Land" in line:
@@ -101,9 +98,12 @@ class MonitorFlight(multiprocessing.Process):
                     if "preflight disarming" in line:
                         result = 'PreArm Failed'
                         break
+                    if "SIM Hit ground" in line:
+                        result = 'crash'
+                        break
                 elif status_message.severity == 2 or status_message.severity == 0:
                     # Appear error, break loop and return false
-                    if "SIM Hit ground at" in line \
+                    if "SIM Hit ground" in line \
                             or "Crash" in line \
                             or "Failsafe enabled: no global position" in line \
                             or "failure detected" in line:
@@ -112,7 +112,7 @@ class MonitorFlight(multiprocessing.Process):
                     elif "Potential Thrust Loss" in line:
                         result = 'Thrust Loss'
                         break
-                    elif "PreArm" in line:# or "speed has been constrained by max speed" in line:
+                    elif "PreArm" in line: # or "speed has been constrained by max speed" in line:
                         result = 'PreArm Failed'
                         break
 
@@ -151,10 +151,7 @@ class MonitorFlight(multiprocessing.Process):
                 pre_alt = alt
 
                 if start_check:
-                    if alt < 1:
-                        low_lat_num += 1
-                    else:
-                        small_move_num = 0
+                    small_move_num = 0
 
                     velocity = moving_dis / time_step
                     # logging.debug(f"Velocity {velocity}.")
@@ -179,16 +176,18 @@ class MonitorFlight(multiprocessing.Process):
                     # Is deviation ?
                     # logging.debug(f"Point2line distance {deviation_dis}.")
                     if deviation_dis > 10:
-                        logging.debug(f"Deviation {round(deviation_dis, 4)}, num++, num now - {deviation_num}.")
+                        if deviation_dis % 5 == 0:
+                            logging.debug(f"Deviation {round(deviation_dis, 4)}, "
+                                          f"num++, num now - {deviation_num}.")
                         deviation_num += 1
                     else:
                         deviation_num = 0
 
-                    # deviation
+                    # # Threshold; deviation judgement
                     if deviation_num > 15:
                         result = 'deviation'
                         break
-                    # Threshold; Judgement
+
                     # Timeout
                     if small_move_num > 10:
                         result = 'timeout'
@@ -197,7 +196,6 @@ class MonitorFlight(multiprocessing.Process):
 
             # Timeout Check if stack at one point
             mid_point_time = time.time()
-            last_time = mid_point_time
             if (mid_point_time - start_time) > mission_time_out_th:
                 result = 'timeout'
                 break

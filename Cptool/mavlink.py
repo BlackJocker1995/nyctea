@@ -142,6 +142,10 @@ class DroneMavlink:
         if not self._master:
             raise ValueError('Connect at first!')
         self._master.param_set_send(param, value)
+        message = self._master.recv_match(type='PARAM_VALUE', blocking=True, timeout=3)
+        if message is not None:
+            message = message.to_dict()
+            logging.debug('name: %s\t value: %f' % (message['param_id'], message['param_value']))
         # self.get_param(param)
 
     def set_params(self, params_dict: dict) -> None:
