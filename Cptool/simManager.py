@@ -79,6 +79,7 @@ class SimManager:
             port = 4560 + int(drone_i)
             cmd = f'{toolConfig.JMAVSIM_PATH} -p {port} -l'
         self._sim_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_RUN_PATH, timeout=30, encoding='utf-8')
+        logging.debug("Init px4 Jmavsim description.")
 
     def start_sitl(self):
         """

@@ -375,8 +375,8 @@ class DDPGAgent(ReLearningAgent):
                 return
             except Exception as e:
                 logging.info(f"Exception: {e}, and save model")
-                while True:
-                    time.sleep(0.1)
+                # while True:
+                #     time.sleep(0.1)
                 # logging.info(f"Exception: {e}, and save model")
                 # # self.save_point()
                 # send_notice(self.device, self.buffer_length, e)

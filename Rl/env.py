@@ -124,7 +124,7 @@ class DroneEnv:
             self.manager.start_multiple_sim(self.device)
             self.manager.online_mavlink_init(MavlinkPX4, self.device)
             mission_file = 'Cptool/fitCollection_px4.txt'
-            self.manager.mav_monitor_init(int(14550) + int(self.device))
+            self.manager.mav_monitor_init(int(14030) + int(self.device))
         else:
             self.manager.online_mavlink_init(MavlinkAPM, self.device)
             mission_file = 'Cptool/fitCollection.txt'

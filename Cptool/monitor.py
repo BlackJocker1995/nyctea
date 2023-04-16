@@ -18,6 +18,9 @@ class MonitorFlight(multiprocessing.Process):
         # if isinstance(arg, int):
         self.master = mavutil.mavlink_connection('udp:0.0.0.0:{}'.format(arg))
         self.master.wait_heartbeat(timeout=30)
+        logging.info("Heartbeat from system (system %u component %u) from %u" % (
+            self.master.target_system, self.master.target_component, arg))
+
         # if isinstance(arg, pymavlink.mavutil.mavudp):
         #     self.master = arg
         # else:
