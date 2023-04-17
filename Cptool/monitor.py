@@ -129,9 +129,9 @@ class MonitorFlight(multiprocessing.Process):
                     # Start Check
                     if int(position_msg.seq) == 2:
                         start_check = True
-                    # # can start check
-                    # if int(position_msg.seq) == 2:
-                    #     self.mav_monitor.recv_msg_queue.put(["start2point", time.time()])
+                    if int(position_msg.seq) == 1 and toolConfig.MODE == "PX4":
+                        start_check = True
+
                     current_mission = int(position_msg.seq)
                     if toolConfig.MODE == "PX4" and int(position_msg.seq) == 5:
                         start_check = False
@@ -146,7 +146,9 @@ class MonitorFlight(multiprocessing.Process):
 
                 # Calculate distance
                 moving_dis = Location.distance(pre_location, position)
+                # time
                 time_step = position.timeS - pre_location.timeS
+                # altitude change
                 alt_change = abs(pre_alt - alt)
                 # Update position
                 pre_location.x = position_lat
@@ -154,13 +156,10 @@ class MonitorFlight(multiprocessing.Process):
                 pre_alt = alt
 
                 if start_check:
-                    small_move_num = 0
-
                     velocity = moving_dis / time_step
-                    # logging.debug(f"Velocity {velocity}.")
-                    # Is small move?
-                    # logging.debug(f"alt_change {alt_change}.")
-                    if velocity < 1 and alt_change < 0.1 and small_move_num != 0:
+                    # print(f"Velocity {velocity}.")
+                    # Is small move? velocity smaller than 1 and altitude change  smaller than 0.1
+                    if velocity < 1 and alt_change < 0.1:
                         logging.debug(f"Small moving {small_move_num}, num++, num now - {small_move_num}.")
                         small_move_num += 1
                     else:

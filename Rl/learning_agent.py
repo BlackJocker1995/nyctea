@@ -293,18 +293,32 @@ class DDPGAgent(ReLearningAgent):
             filepath = "model/PX4"
         else:
             filepath = "model/Ardupilot"
+
         if os.path.exists(f"{filepath}/actor.pth"):
+
             while not (os.access(f"{filepath}/actor.pth", os.R_OK) and
                        os.access(f"{filepath}/critic.pth", os.R_OK) and
                        os.access(f"{filepath}/actor_target.pth", os.R_OK) and
                        os.access(f"{filepath}/critic_target.pth", os.R_OK)):
                 continue
 
-            self.actor = torch.load(f"{filepath}/actor.pth")
-            self.critic = torch.load(f"{filepath}/critic.pth")
-            self.actor_target = torch.load(f"{filepath}/actor_target.pth")
-            self.critic_target = torch.load(f"{filepath}/critic_target.pth")
-            # logging.info("Load previous model.")
+            with open(f"{filepath}/actor.pth", "rb") as fp1, \
+                    open(f"{filepath}/critic.pth", "rb") as fp2, \
+                    open(f"{filepath}/actor_target.pth", "rb") as fp3, \
+                    open(f"{filepath}/critic_target.pth", "rb") as fp4:
+                fcntl.flock(fp1, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp2, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp3, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp4, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self.actor = torch.load(fp1)
+                self.critic = torch.load(fp2)
+                self.actor_target = torch.load(fp3)
+                self.critic_target = torch.load(fp4)
+                fcntl.flock(fp1, fcntl.LOCK_UN)
+                fcntl.flock(fp2, fcntl.LOCK_UN)
+                fcntl.flock(fp3, fcntl.LOCK_UN)
+                fcntl.flock(fp4, fcntl.LOCK_UN)
+            logging.info("Load previous model.")
 
     def train_from_incorrent(self):
         while True:
@@ -314,7 +328,7 @@ class DDPGAgent(ReLearningAgent):
 
                 logging.info("Change configuration.")
                 self.env.get_random_incorrent_configuration()
-                set_result = self.env.reset()
+                set_result = self.env.reset(delete_log=True)
                 # reset fault, retry
                 if not set_result:
                     continue
@@ -373,11 +387,37 @@ class DDPGAgent(ReLearningAgent):
             except KeyboardInterrupt:
                 self.save_point()
                 return
+            # except Exception as e:
+            #     logging.info(f"Exception: {e}, and save model")
+            #     # self.save_point()
+            #     send_notice(self.device, self.buffer_length, e)
+            #     exit(-1)
+
+    def online_bin_monitor_rl(self):
+        self.check_point()
+        action_num = 0
+        while True:
+            try:
+                time.sleep(1)
+                if not self.env.manager.mav_monitor.msg_queue.empty():
+                    # receive error result
+                    if not self.env.manager.mav_monitor.msg_queue.empty():
+                        manager_msg, _ = self.env.manager.mav_monitor.msg_queue.get(block=True)
+                        return manager_msg, action_num
+
+                cur_state = self.env.catch_state()
+                logging.info(f"Observation deviation {self.env.cur_deviation}")
+                #
+                if self.env.cur_deviation > self.env.deviation_threshold:
+                    logging.info(f"Deviation {self.env.cur_deviation} detect.")
+                    action_0 = self.select_action(cur_state)
+                    # translate the action to configuration
+                    action_0 = self.action2config(action_0)
+                    configuration = pd.DataFrame(action_0.reshape((-1, self.env.parameter_shape)),
+                                                 columns=toolConfig.PARAM).iloc[0].to_dict()
+                    # print(configuration)
+                    self.env.manager.online_mavlink.set_params(configuration)
+                    action_num += 1
+                    time.sleep(2)
             except Exception as e:
-                logging.info(f"Exception: {e}, and save model")
-                # while True:
-                #     time.sleep(0.1)
-                # logging.info(f"Exception: {e}, and save model")
-                # # self.save_point()
-                # send_notice(self.device, self.buffer_length, e)
-                # exit(-1)
+                print(e)

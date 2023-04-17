@@ -193,7 +193,7 @@ class ToolConfig:
 
 
 toolConfig = ToolConfig()
-toolConfig.select_mode("Ardupilot")
+toolConfig.select_mode("PX4")
 
 # toolConfig.PARAM = [
 #     "PSC_POSXY_P",

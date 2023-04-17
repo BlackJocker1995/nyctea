@@ -100,19 +100,20 @@ class DroneEnv:
 
         return out_state, deviation
 
-    def reset(self, delay=True):
+    def reset(self, delay=True, delete_log=False):
         """
         Reset Environment
         """
         # if alive, close
         if self.manager is not None:
             print(self.manager)
-            self.manager.mav_monitor.terminate()
-            self.manager.board_mavlink.terminate()
             self.manager.stop_sitl()
             if toolConfig.MODE == "PX4":
                 self.manager.stop_sim()
-            self.manager.board_mavlink.delete_current_log(self.device)
+            self.manager.mav_monitor.terminate()
+            self.manager.board_mavlink.terminate()
+            if delete_log:
+                self.manager.board_mavlink.delete_current_log(self.device)
         logging.debug("Stop previous simulation successfully.")
 
         # Manager
@@ -136,6 +137,8 @@ class DroneEnv:
         set_result = self.manager.online_mavlink.set_mission(mission_file, False)
         if not set_result:
             logging.warning("Mission file set failed!")
+            while True:
+                time.sleep(0.1)
             return False
 
         # PX4 requires waiting 2 seconds.

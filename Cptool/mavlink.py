@@ -66,7 +66,7 @@ class DroneMavlink:
             logging.debug(f"Error {e}")
             return False
 
-    def set_mission(self, mission_file, israndom: bool = False, timeout=30) -> bool:
+    def set_mission(self, mission_file, israndom: bool = False) -> bool:
         """
         Set mission
         :param israndom: random mission order
@@ -88,6 +88,7 @@ class DroneMavlink:
         if toolConfig.MODE == "PX4":
             set_result = self.px4_set_home()
             if not set_result:
+                logging.warning("PX4 set home failed!")
                 return False
 
         if israndom:
@@ -106,7 +107,7 @@ class DroneMavlink:
                     self._master.mav.send(loader.wp(msg.seq))
                     seq_list[msg.seq] = False
                     logging.debug(f'Sending waypoint {msg.seq}')
-            mission_ack_msg = self._master.recv_match(type=['MISSION_ACK'], blocking=True, timeout=timeout)
+            mission_ack_msg = self._master.recv_match(type=['MISSION_ACK'], blocking=True, timeout=5)
             logging.info(f'Upload mission finish.')
         except TimeoutError:
             logging.warning('Upload mission timeout!')
@@ -244,9 +245,7 @@ class DroneMavlink:
                                                40.072842,
                                                -105.230575,
                                                0.000000)
-        msg = self._master.recv_match(type=['COMMAND_ACK'], blocking=True, timeout=30)
-        if msg is None:
-            return False
+        msg = self._master.recv_match(type=['COMMAND_ACK'], blocking=True, timeout=5)
         logging.debug(f"Home set callback: {msg.command}")
         return True
 
