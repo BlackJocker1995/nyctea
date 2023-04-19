@@ -2,8 +2,11 @@ import csv
 import logging
 import os
 import random
+import signal
 import time
 from copy import deepcopy
+
+import psutil
 from sklearn.utils import shuffle
 
 import numpy as np
@@ -106,16 +109,9 @@ class DroneEnv:
         """
         # if alive, close
         if self.manager is not None:
-            print(self.manager)
-            self.manager.stop_sitl()
-            if toolConfig.MODE == "PX4":
-                self.manager.stop_sim()
-            self.manager.mav_monitor.terminate()
-            self.manager.board_mavlink.terminate()
-            if delete_log:
-                self.manager.board_mavlink.delete_current_log(self.device)
-        logging.debug("Stop previous simulation successfully.")
-
+            self.close_env()
+            self.manager.board_mavlink.delete_current_log(self.device)
+            del self.manager
         # Manager
         self.manager = FixSimManager(self.debug)
 
@@ -137,8 +133,6 @@ class DroneEnv:
         set_result = self.manager.online_mavlink.set_mission(mission_file, False)
         if not set_result:
             logging.warning("Mission file set failed!")
-            while True:
-                time.sleep(0.1)
             return False
 
         # PX4 requires waiting 2 seconds.
@@ -243,3 +237,26 @@ class DroneEnv:
         self.cur_state = next_state
         self.cur_deviation = played_deviation
         return next_state.to_numpy().reshape(-1), reward, finish
+
+    def close_env(self):
+        self.try_kill_mavproxy()
+        self.manager.stop_sitl()
+        if toolConfig.MODE == "PX4":
+            self.manager.stop_sim()
+        self.manager.mav_monitor.terminate()
+        self.manager.board_mavlink.terminate()
+        logging.debug("Stop previous simulation successfully.")
+
+    def try_kill_mavproxy(self):
+        device = int(self.device)
+        for proc in psutil.process_iter():
+            try:
+                cmdline = proc.cmdline()
+                pid = proc.pid
+            except psutil.NoSuchProcess:
+                continue
+
+            if (len(cmdline) >= 2 and
+                os.path.basename(cmdline[1]) == "mavproxy.py") and \
+                    str(14550 + device) in cmdline[3]:
+                os.kill(pid, signal.SIGKILL)

@@ -53,6 +53,7 @@ class DroneMavlink:
         try:
             while True:
                 message = self._master.recv_match(type=['STATUSTEXT'], blocking=True, timeout=30)
+
                 message = message.to_dict()["text"]
                 # print(message)
                 if toolConfig.MODE == "Ardupilot" and "IMU0 is using GPS" in message:

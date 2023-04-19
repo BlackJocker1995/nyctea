@@ -18,3 +18,4 @@ if __name__ == "__main__":
         device = 0
     ddpg_agent = DDPGAgent(device=device)
     ddpg_agent.train_from_incorrent()
+    ddpg_agent.close()

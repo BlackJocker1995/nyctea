@@ -410,6 +410,7 @@ class BoardMavlinkAPM(BoardMavlink):
                     continue
                 # send this message
                 self.data_segments.put([status_data, round(time_last / 1000000, 1)])
+                logging.debug("Read a segment successfully send to main thread.")
             except Exception as e:
                 logging.warning(f"{e}, then continue looping")
 

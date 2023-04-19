@@ -4,6 +4,7 @@ import logging
 import os
 import pickle
 import random
+import sys
 import time
 from abc import abstractmethod
 
@@ -159,7 +160,7 @@ class DDPGAgent(ReLearningAgent):
             while os.path.exists(pathfile) and not os.access(pathfile, os.W_OK):
                 continue
             with open(pathfile, "ab+") as fp:
-                fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp, fcntl.LOCK_EX)
                 pik_data = pickle.dumps(transition)
                 fp.write(pik_data)
                 # line flag
@@ -167,7 +168,7 @@ class DDPGAgent(ReLearningAgent):
                 fcntl.flock(fp, fcntl.LOCK_UN)
         else:
             with open(pathfile, "wb+") as fp:
-                fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp, fcntl.LOCK_EX)
                 pik_data = pickle.dumps(transition)
                 fp.write(pik_data)
                 # line flag
@@ -184,7 +185,7 @@ class DDPGAgent(ReLearningAgent):
         while os.path.exists(pathfile) and not os.access(pathfile, os.R_OK):
             continue
         with open(pathfile, "rb") as fp:
-            fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fp, fcntl.LOCK_EX)
             tmp_obj = fp.read()
             fcntl.flock(fp, fcntl.LOCK_UN)
         # binary split with flag b";;\n"
@@ -268,10 +269,10 @@ class DDPGAgent(ReLearningAgent):
                     open(f"{filepath}/critic.pth", "wb") as fp2, \
                     open(f"{filepath}/actor_target.pth", "wb") as fp3, \
                     open(f"{filepath}/critic_target.pth", "wb") as fp4:
-                fcntl.flock(fp1, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                fcntl.flock(fp2, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                fcntl.flock(fp3, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                fcntl.flock(fp4, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp1, fcntl.LOCK_EX)
+                fcntl.flock(fp2, fcntl.LOCK_EX)
+                fcntl.flock(fp3, fcntl.LOCK_EX)
+                fcntl.flock(fp4, fcntl.LOCK_EX)
                 torch.save(self.actor, fp1)
                 torch.save(self.critic, fp2)
                 torch.save(self.actor_target, fp3)
@@ -306,10 +307,10 @@ class DDPGAgent(ReLearningAgent):
                     open(f"{filepath}/critic.pth", "rb") as fp2, \
                     open(f"{filepath}/actor_target.pth", "rb") as fp3, \
                     open(f"{filepath}/critic_target.pth", "rb") as fp4:
-                fcntl.flock(fp1, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                fcntl.flock(fp2, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                fcntl.flock(fp3, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                fcntl.flock(fp4, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fp1, fcntl.LOCK_EX)
+                fcntl.flock(fp2, fcntl.LOCK_EX)
+                fcntl.flock(fp3, fcntl.LOCK_EX)
+                fcntl.flock(fp4, fcntl.LOCK_EX)
                 self.actor = torch.load(fp1)
                 self.critic = torch.load(fp2)
                 self.actor_target = torch.load(fp3)
@@ -386,12 +387,16 @@ class DDPGAgent(ReLearningAgent):
 
             except KeyboardInterrupt:
                 self.save_point()
+                input("Any key to exit...")
                 return
-            # except Exception as e:
-            #     logging.info(f"Exception: {e}, and save model")
-            #     # self.save_point()
-            #     send_notice(self.device, self.buffer_length, e)
-            #     exit(-1)
+            except Exception as e:
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                frame = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                # self.save_point()
+                send_notice(self.device, self.buffer_length, [frame, exc_tb.tb_lineno, e])
+                logging.info(f"Exception: {exc_type}, {frame}, {exc_tb.tb_lineno}.")
+                input("Any key to continue...")
+                continue
 
     def online_bin_monitor_rl(self):
         self.check_point()
@@ -421,3 +426,6 @@ class DDPGAgent(ReLearningAgent):
                     time.sleep(2)
             except Exception as e:
                 print(e)
+
+    def close(self):
+        self.env.close_env()

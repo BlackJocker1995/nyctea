@@ -101,9 +101,9 @@ class MonitorFlight(multiprocessing.Process):
                     if "preflight disarming" in line:
                         result = 'PreArm Failed'
                         break
-                    if "SIM Hit ground" in line:
-                        result = 'crash'
-                        break
+                    # if "SIM Hit ground" in line:
+                    #     result = 'crash'
+                    #     break
                 elif status_message.severity == 2 or status_message.severity == 0:
                     # Appear error, break loop and return false
                     if "SIM Hit ground" in line \
@@ -160,8 +160,8 @@ class MonitorFlight(multiprocessing.Process):
                     # print(f"Velocity {velocity}.")
                     # Is small move? velocity smaller than 1 and altitude change  smaller than 0.1
                     if velocity < 1 and alt_change < 0.1:
-                        logging.debug(f"Small moving {small_move_num}, num++, num now - {small_move_num}.")
                         small_move_num += 1
+                        logging.debug(f"Small moving {small_move_num}, num++, num now - {small_move_num}.")
                     else:
                         small_move_num = 0
 

@@ -37,10 +37,10 @@ class SimManager:
         for h in root_logger.handlers[:]:
             root_logger.removeHandler(h)
         if debug:
-            logging.basicConfig(format='%(asctime)s - %(filename)s[%(lineno)d] - %(levelname)s: %(message)s',
+            logging.basicConfig(format='%(asctime)s-PID(%(process)d) %(filename)s[%(lineno)d]: %(message)s',
                                 level=logging.DEBUG)
         else:
-            logging.basicConfig(format='%(asctime)s - %(filename)s[%(lineno)d] - %(levelname)s: %(message)s',
+            logging.basicConfig(format='%(asctime)s-PID(%(process)d) %(filename)s[%(lineno)d]: %(message)s',
                                 level=logging.INFO)
 
     """
@@ -269,6 +269,9 @@ class SimManager:
     """
     Simulator Operation
     """
+
+    def kill_mavproxy(self):
+        os.kill(int(pid), signal.SIGKILL)
 
     def stop_sitl(self):
         self._sitl_task.sendcontrol('c')

@@ -7,6 +7,7 @@ import argparse
 import time
 
 import gym
+import ray
 import torch
 
 from Rl.learning_agent import DDPGAgent
@@ -26,6 +27,11 @@ from Rl.learning_agent import DDPGAgent
 #     critic_target = torch.load(f"{filepath}/critic_target.pth")
 #     return actor, critic, actor_target, critic_target
 
+@ray.remote
+def run_train(device):
+    ddpg_agent = DDPGAgent(device=device)
+    ddpg_agent.train_from_incorrent()
+    ddpg_agent.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Personal information')
@@ -34,6 +40,13 @@ if __name__ == '__main__':
     thread = args.thread
     thread = int(thread)
     print(thread)
+
+    # threat_manage = []
+    # ray.init(include_dashboard=True, dashboard_host="127.0.0.1", dashboard_port=8088)
+    # for i in range(thread):
+    #     threat_manage.append(run_train.remote(i))
+    # ray.get(threat_manage)
+    # ray.shutdown()
 
     for i in range(thread):
         cmd = f'gnome-terminal --tab --working-directory={os.getcwd()} -e ' \
