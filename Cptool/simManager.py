@@ -142,6 +142,18 @@ class SimManager:
             self._sitl_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_RUN_PATH, timeout=30, encoding='utf-8')
             logging.info(f"Start {toolConfig.MODE} --> [{toolConfig.SIM}]")
 
+    # def start_SITL_from_bin(self):
+    #
+    #     binary = toolConfig.SITL_BIN_PATH
+    #     sitl = util.start_SITL(binary,
+    #                            wipe=True,
+    #                            model=frame,
+    #                            home=home,
+    #                            speedup=10,
+    #                            unhide_parameters=True)
+    #     mavproxy = util.start_MAVProxy_SITL(atype,
+    #                                         master=mavproxy_master)
+
     def start_multiple_sitl(self, drone_i=0):
         """
         start multiple simulators (not support PX4 now)

@@ -17,14 +17,12 @@ class MonitorFlight(multiprocessing.Process):
         # port
         # if isinstance(arg, int):
         self.master = mavutil.mavlink_connection('udp:0.0.0.0:{}'.format(arg))
-        self.master.wait_heartbeat(timeout=30)
-        logging.info("Heartbeat from system (system %u component %u) from %u" % (
-            self.master.target_system, self.master.target_component, arg))
-
-        # if isinstance(arg, pymavlink.mavutil.mavudp):
-        #     self.master = arg
-        # else:
-        #     raise TypeError(f"Not supported type: {type(arg)}")
+        result = self.master.wait_heartbeat(timeout=30)
+        if result is None:
+            raise ValueError("Fail to connect 'udp:0.0.0.0:{}'.format(arg).")
+        else:
+            logging.info("Heartbeat from system (system %u component %u) from %u" % (
+                self.master.target_system, self.master.target_component, arg))
 
     def get_msg(self, msg_type, block=False):
         """
@@ -115,7 +113,7 @@ class MonitorFlight(multiprocessing.Process):
                     elif "Potential Thrust Loss" in line:
                         result = 'Thrust Loss'
                         break
-                    elif "PreArm" in line: # or "speed has been constrained by max speed" in line:
+                    elif "PreArm" in line:  # or "speed has been constrained by max speed" in line:
                         result = 'PreArm Failed'
                         break
 

@@ -399,31 +399,35 @@ class DDPGAgent(ReLearningAgent):
                 continue
 
     def online_bin_monitor_rl(self):
-        self.check_point()
         action_num = 0
         while True:
+            deviations_his = []
             try:
                 time.sleep(1)
                 if not self.env.manager.mav_monitor.msg_queue.empty():
                     # receive error result
                     if not self.env.manager.mav_monitor.msg_queue.empty():
                         manager_msg, _ = self.env.manager.mav_monitor.msg_queue.get(block=True)
-                        return manager_msg, action_num
+                        return manager_msg, action_num, deviations_his
 
                 cur_state = self.env.catch_state()
                 logging.info(f"Observation deviation {self.env.cur_deviation}")
-                #
+                deviations_his.append(self.env.cur_deviation)
                 if self.env.cur_deviation > self.env.deviation_threshold:
                     logging.info(f"Deviation {self.env.cur_deviation} detect.")
                     action_0 = self.select_action(cur_state)
                     # translate the action to configuration
                     action_0 = self.action2config(action_0)
                     configuration = pd.DataFrame(action_0.reshape((-1, self.env.parameter_shape)),
-                                                 columns=toolConfig.PARAM).iloc[0].to_dict()
+                                                 columns=toolConfig.PARAM)
+                    configuration = configuration[toolConfig.PARAM_PART].iloc[0].to_dict()
                     # print(configuration)
                     self.env.manager.online_mavlink.set_params(configuration)
                     action_num += 1
                     time.sleep(2)
+            except KeyboardInterrupt:
+                input("Any key to exit...")
+                return "timeout", action_num, deviations_his
             except Exception as e:
                 print(e)
 

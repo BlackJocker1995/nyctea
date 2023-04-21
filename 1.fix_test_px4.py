@@ -16,6 +16,7 @@ from Cptool.simManager import SimManager, FixSimManager
 from Rl.learning_agent import DDPGAgent
 
 if __name__ == '__main__':
+    toolConfig.select_mode("PX4")
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     # Device
     parser = argparse.ArgumentParser(description='Personal information')
