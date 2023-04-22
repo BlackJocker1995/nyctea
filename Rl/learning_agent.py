@@ -305,10 +305,12 @@ class DDPGAgent(ReLearningAgent):
             fcntl.flock(fp2, fcntl.LOCK_EX)
             fcntl.flock(fp3, fcntl.LOCK_EX)
             fcntl.flock(fp4, fcntl.LOCK_EX)
+
             torch.save(self.actor, fp1)
             torch.save(self.critic, fp2)
             torch.save(self.actor_optim, fp3)
             torch.save(self.critic_optim, fp4)
+
             fcntl.flock(fp1, fcntl.LOCK_UN)
             fcntl.flock(fp2, fcntl.LOCK_UN)
             fcntl.flock(fp3, fcntl.LOCK_UN)
@@ -361,15 +363,16 @@ class DDPGAgent(ReLearningAgent):
                     open(f"{filepath}/critic.pth", "rb") as fp2, \
                     open(f"{filepath}/actor_optimizer.pth", "rb") as fp3, \
                     open(f"{filepath}/critic_optimizer.pth", "rb") as fp4:
+
                 fcntl.flock(fp1, fcntl.LOCK_EX)
                 fcntl.flock(fp2, fcntl.LOCK_EX)
                 fcntl.flock(fp3, fcntl.LOCK_EX)
                 fcntl.flock(fp4, fcntl.LOCK_EX)
 
-                self.actor.load_state_dict(torch.load(fp1))
-                self.critic.load_state_dict(torch.load(fp2))
-                self.actor_optim.load_state_dict(torch.load(fp3))
-                self.actor_optim.load_state_dict(torch.load(fp4))
+                self.actor = torch.load(fp1)
+                self.critic = torch.load(fp2)
+                self.actor_optim = torch.load(fp3)
+                self.actor_optim = torch.load(fp4)
 
                 fcntl.flock(fp1, fcntl.LOCK_UN)
                 fcntl.flock(fp2, fcntl.LOCK_UN)
@@ -377,7 +380,7 @@ class DDPGAgent(ReLearningAgent):
                 fcntl.flock(fp4, fcntl.LOCK_UN)
 
             self.actor_target = copy.deepcopy(self.actor)
-            self.critic_target = copy.deepcopy(self.actor)
+            self.critic_target = copy.deepcopy(self.critic)
 
         logging.info("Load previous model.")
 
