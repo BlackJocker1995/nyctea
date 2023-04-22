@@ -46,14 +46,14 @@ class DroneEnv:
         # display debug information
         self.debug = debug
 
-    def get_random_incorrent_configuration(self, deduplicate=False):
+    def get_random_incorrent_configuration(self, param_file, deduplicate=False):
         """
         set a random incorrent configuration from ICSearcher
         @param deduplicate:
         @return:
         """
         # Read incorrect configuration
-        configurations = pd.read_csv(f"validation/{toolConfig.MODE}/params{toolConfig.EXE}.csv")
+        configurations = pd.read_csv(param_file)
         incorrect_configuration = configurations[configurations["result"] != "pass"]
 
         # Stochastic order
@@ -120,11 +120,17 @@ class DroneEnv:
         if toolConfig.MODE == "PX4":
             self.manager.start_multiple_sim(self.device)
             self.manager.online_mavlink_init(MavlinkPX4, self.device)
-            mission_file = 'Cptool/fitCollection_px4.txt'
+            if toolConfig.HOME is None:
+                mission_file = 'Cptool/mission_px4.txt'
+            else:
+                mission_file = 'Cptool/fitCollection_px4.txt'
             self.manager.mav_monitor_init(int(14030) + int(self.device))
         else:
             self.manager.online_mavlink_init(MavlinkAPM, self.device)
-            mission_file = 'Cptool/fitCollection.txt'
+            if toolConfig.HOME is None:
+                mission_file = 'Cptool/mission.txt'
+            else:
+                mission_file = 'Cptool/fitCollection.txt'
             self.manager.mav_monitor_init(int(14560) + int(self.device))
         self.manager.board_mavlink_init()
         logging.debug("Start new simulation environment.")
@@ -258,5 +264,5 @@ class DroneEnv:
 
             if (len(cmdline) >= 2 and
                 os.path.basename(cmdline[1]) == "mavproxy.py") and \
-                    str(14550 + device) in cmdline[3]:
+                    str(14540 + device) in cmdline[3]:
                 os.kill(pid, signal.SIGKILL)

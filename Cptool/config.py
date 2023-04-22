@@ -22,7 +22,7 @@ class ToolConfig:
         # Simulation Speed
         self.__dict__["SPEED"] = 3
         # Flight home (None, AVC_plane)
-        self.__dict__["HOME"] = "AVC_plane"  # "AVC_plane"
+        self.__dict__["HOME"] = None #"AVC_plane"  # "AVC_plane"
         # Output Debug Message
         self.__dict__["DEBUG"] = True
         # Wind Speed range
@@ -80,14 +80,14 @@ class ToolConfig:
             self.__dict__["SIM"] = "SITL"  # "Jmavsim"
 
             # Mavlink Part
-            self.__dict__["LOG_MAP"] = ['IMU', 'ATT', 'RATE', 'PARM', 'VIBE', "MAG"]  # "POS"
+            self.__dict__["LOG_MAP"] = ['IMU', 'ATT', 'RATE', 'PARM']#, 'VIBE', "MAG"]  # "POS"
             # Online Mavlink Part
             self.__dict__["OL_LOG_MAP"] = ['ATTITUDE', 'RAW_IMU', 'VIBRATION']  # 'GLOBAL_POSITION_INT'
             # Status Order
             self.__dict__["STATUS_ORDER"] = ['TimeS', 'Roll', 'Pitch', 'Yaw', 'RateRoll', 'RatePitch', 'RateYaw',
                                         'DesRoll', 'DesPitch', 'DesYaw', 'DesRateRoll', 'DesRatePitch', 'DesRateYaw',
-                                             'AccX', 'AccY', 'AccZ', 'GyrX', 'GyrY', 'GyrZ',
-                                             'MagX', 'MagY', 'MagZ', 'VibeX', 'VibeY', 'VibeZ']
+                                             'AccX', 'AccY', 'AccZ', 'GyrX', 'GyrY', 'GyrZ']
+                                             #'MagX', 'MagY', 'MagZ', 'VibeX', 'VibeY', 'VibeZ']
 
             with open('Cptool/param_ardu.json', 'r') as f:
                 param_name = pd.DataFrame(json.loads(f.read())).columns.tolist()
@@ -97,23 +97,18 @@ class ToolConfig:
                 "PSC_VELXY_P",
                 "PSC_VELXY_I",
                 "PSC_VELXY_D",
-                "PSC_ACCZ_P",
-                # "PSC_ACCZ_I",
-                # "ATC_ANG_RLL_P",
-                # "ATC_RAT_RLL_P",
-                # "ATC_RAT_RLL_I",
-                # "ATC_RAT_RLL_D",
-                # "ATC_ANG_PIT_P",
-                # "ATC_RAT_PIT_P",
-                # "ATC_RAT_PIT_I",
-                # "ATC_RAT_PIT_D",!Cnis1002
-                # "ATC_ANG_YAW_P",
-                # "ATC_RAT_YAW_P",
-                # "ATC_RAT_YAW_I",
-                # "ATC_RAT_YAW_D",
-                # "WPNAV_SPEED",
-                # "WPNAV_ACCEL",
-                # "ANGLE_MAX"
+                "ATC_ANG_RLL_P",
+                "ATC_RAT_RLL_P",
+                "ATC_RAT_RLL_I",
+                "ATC_RAT_RLL_D",
+                "ATC_ANG_PIT_P",
+                "ATC_RAT_PIT_P",
+                "ATC_RAT_PIT_I",
+                "ATC_RAT_PIT_D",
+                "ATC_ANG_YAW_P",
+                "ATC_RAT_YAW_P",
+                "ATC_RAT_YAW_I",
+                "ATC_RAT_YAW_D",
             ]
 
             # self.__dict__["PARAM"] = [

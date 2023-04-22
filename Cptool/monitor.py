@@ -58,14 +58,20 @@ class MonitorFlight(multiprocessing.Process):
 
         logging.info('Start error monitor.')
         # Setting
-        mission_time_out_th = 180
+        mission_time_out_th = 360
         result = 'pass'
         # Waypoint
         loader = mavwp.MAVWPLoader()
         if toolConfig.MODE == "PX4":
-            loader.load('Cptool/fitCollection_px4.txt')
+            if toolConfig.HOME is None:
+                loader.load('Cptool/mission_px4.txt')
+            else:
+                loader.load('Cptool/fitCollection_px4.txt')
         else:
-            loader.load('Cptool/fitCollection.txt')
+            if toolConfig.HOME is None:
+                loader.load('Cptool/mission.txt')
+            else:
+                loader.load('Cptool/fitCollection.txt')
         #
         lpoint1 = Location(loader.wpoints[0])
         lpoint2 = Location(loader.wpoints[1])
@@ -119,7 +125,7 @@ class MonitorFlight(multiprocessing.Process):
 
             if position_msg is not None and position_msg.get_type() == "MISSION_CURRENT":
                 # print(position_msg)
-                if int(position_msg.seq) > current_mission and int(position_msg.seq) != 6:
+                if int(position_msg.seq) > current_mission: # and int(position_msg.seq) != 6:
                     logging.debug(f"Mission change {current_mission} -> {position_msg.seq}")
                     lpoint1 = Location(loader.wpoints[current_mission])
                     lpoint2 = Location(loader.wpoints[position_msg.seq])
@@ -131,7 +137,7 @@ class MonitorFlight(multiprocessing.Process):
                         start_check = True
 
                     current_mission = int(position_msg.seq)
-                    if toolConfig.MODE == "PX4" and int(position_msg.seq) == 5:
+                    if toolConfig.MODE == "PX4": # and int(position_msg.seq) == 5:
                         start_check = False
             elif position_msg is not None and position_msg.get_type() == "GLOBAL_POSITION_INT":
                 # print(position_msg)
@@ -175,7 +181,7 @@ class MonitorFlight(multiprocessing.Process):
                         deviation_dis = 0
                     # Is deviation ?
                     # logging.debug(f"Point2line distance {deviation_dis}.")
-                    if deviation_dis > 10:
+                    if deviation_dis > 5:
                         if deviation_dis % 5 == 0:
                             logging.debug(f"Deviation {round(deviation_dis, 4)}, "
                                           f"num++, num now - {deviation_num}.")
@@ -184,7 +190,7 @@ class MonitorFlight(multiprocessing.Process):
                         deviation_num = 0
 
                     # # Threshold; deviation judgement
-                    if deviation_num > 15:
+                    if deviation_num > 10:
                         result = 'deviation'
                         break
 
