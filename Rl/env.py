@@ -217,6 +217,8 @@ class DroneEnv:
             reward = reward / max(1, played_deviation)
             # acc bigger is better
             reward = reward * acc_ratio
+            reward = min(100, reward)
+
         else:
             # negative: bad change
             reward = max(-100, reward)
@@ -242,6 +244,7 @@ class DroneEnv:
 
         self.cur_state = next_state
         self.cur_deviation = played_deviation
+        # reward = reward * 0.01
         return next_state.to_numpy().reshape(-1), reward, finish
 
     def close_env(self):

@@ -95,7 +95,7 @@ class MonitorFlight(multiprocessing.Process):
             # System status message
             if status_message is not None and status_message.get_type() == "STATUSTEXT":
                 line = status_message.text
-                logging.debug(f"Status message: {status_message}")
+                logging.debug(f"Status message: {line}")
                 # print(status_message)
                 if status_message.severity == 6:
                     if "Disarming" in line or "landed" in line or "Landing" in line or "Land" in line:

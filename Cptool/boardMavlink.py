@@ -439,7 +439,7 @@ class BoardMavlinkPX4(BoardMavlink):
         else:
             now = time.localtime()
             now_time = time.strftime("%Y-%m-%d", now)
-            log_path = f"{toolConfig.PX4_RUN_PATH}/build/px4_sitl_default/instance_{device_i}/log/{now_time}/*.ulg"
+            log_path = f"{toolConfig.PX4_PATH}/build/px4_sitl_default/instance_{device_i}/log/{now_time}/*.ulg"
 
             list_of_files = glob.glob(log_path)  # * means all if you need specific format then *.csv
             latest_file = max(list_of_files, key=os.path.getctime)
@@ -481,16 +481,16 @@ class BoardMavlinkPX4(BoardMavlink):
         acc_gyr.columns = ["TimeS", "GyrX", "GyrY", "GyrZ", "AccX", "AccY", "AccZ"]
         acc_gyr = acc_gyr[acc_gyr["TimeS"] > time_last]
 
-        mag = pd.DataFrame(self.flight_log.get_dataset('sensor_mag').data)[["timestamp", "x", "y", "z"]]
-        mag.columns = ["TimeS", "MagX", "MagY", "MagZ"]
-        mag = mag[mag["TimeS"] > time_last]
-
-        vibe = pd.DataFrame(self.flight_log.get_dataset('sensor_accel').data)[["timestamp", "x", "y", "z"]]
-        vibe.columns = ["TimeS", "VibeX", "VibeY", "VibeZ"]
-        vibe = vibe[vibe["TimeS"] > time_last]
+        # mag = pd.DataFrame(self.flight_log.get_dataset('sensor_mag').data)[["timestamp", "x", "y", "z"]]
+        # mag.columns = ["TimeS", "MagX", "MagY", "MagZ"]
+        # mag = mag[mag["TimeS"] > time_last]
+        #
+        # vibe = pd.DataFrame(self.flight_log.get_dataset('sensor_accel').data)[["timestamp", "x", "y", "z"]]
+        # vibe.columns = ["TimeS", "VibeX", "VibeY", "VibeZ"]
+        # vibe = vibe[vibe["TimeS"] > time_last]
 
         # Merge values
-        pd_array = pd.concat([att, rate, acc_gyr, mag, vibe, bias]).sort_values(by='TimeS')
+        pd_array = pd.concat([att, rate, acc_gyr, bias]).sort_values(by='TimeS')
         pd_array["TimeS"] = pd_array["TimeS"] / 1000000
 
         # Process

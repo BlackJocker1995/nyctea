@@ -21,7 +21,7 @@ from Rl.actor_critic import Actor, Critic
 from Cptool.config import toolConfig
 from Cptool.mavtool import load_param, select_sub_dict, read_unit_from_dict, get_default_values, read_range_from_dict, \
     send_notice
-
+from multiprocessing import shared_memory
 from Rl.env import DroneEnv
 
 
@@ -80,21 +80,21 @@ class ReLearningAgent():
 
 
 class DDPGAgent(ReLearningAgent):
-    def __init__(self, device=0, *args):
+    def __init__(self, device=0):
         super().__init__()
         self.device = int(device)
         # play environment
         self.env = DroneEnv(device=device, debug=toolConfig.DEBUG)
         # gamma
-        self.gamma = 0.9
+        self.gamma = 0.99
         # actor learning rate
-        self.actor_lr = 0.001
+        self.actor_lr = 0.01
         # critic learning rate
         self.critic_lr = 0.001
         # tau
         self.tau = 0.02
         # buffer capacity
-        self.capacity = 20000
+        self.capacity = 10000
         # learning batch size
         self.batch_size = 64
 
@@ -106,32 +106,43 @@ class DDPGAgent(ReLearningAgent):
 
         # Buffer length
         self.buffer_length = 0
-
-        if len(args) > 0:
-            self.actor = args[0]
-            self.actor_target = args[1]
-            self.critic = args[2]
-            self.critic_target = args[3]
-            self.actor_optim = args[4]
-            self.critic_optim = args[5]
-        else:
-            # actor network
-            self.actor = Actor(state_shape, 1024, action_dim)
-            self.actor_target = Actor(state_shape, 1024, action_dim)
-            # critic network
-            self.critic = Critic(state_shape + action_dim, 1024, action_dim)
-            self.critic_target = Critic(state_shape + action_dim, 1024, action_dim)
-            # network map
-            self.actor_target.load_state_dict(self.actor.state_dict())
-            self.critic_target.load_state_dict(self.critic.state_dict())
-            # optimizer
-            self.actor_optim = optim.Adam(self.actor.parameters(), lr=self.actor_lr)
-            self.critic_optim = optim.Adam(self.critic.parameters(), lr=self.critic_lr)
-
-            self.check_point()
-
-        # learning buffer, to save memory
         self.buffer = []
+
+        # actor network
+        self.actor = Actor(state_shape, 256, action_dim)
+        self.actor_target = Actor(state_shape, 256, action_dim)
+        # critic network
+        self.critic = Critic(state_shape + action_dim, 256, action_dim)
+        self.critic_target = Critic(state_shape + action_dim, 256, action_dim)
+        # network map
+        self.actor_target.load_state_dict(self.actor.state_dict())
+        self.critic_target.load_state_dict(self.critic.state_dict())
+        # optimizer
+        self.actor_optim = optim.Adam(self.actor.parameters(), lr=self.actor_lr)
+        self.critic_optim = optim.Adam(self.critic.parameters(), lr=self.critic_lr)
+
+        if self.device == 0:
+            self.check_point()
+            try:
+                _shm = shared_memory.ShareableList(name="rl_buffer")
+                _shm.shm.close()
+                _shm.shm.unlink()
+            except Exception as e:
+                pass
+            self.buffer = self.load_buffer()
+            # None and create
+            if self.buffer is None:
+
+                # destroy the shared memory
+                a = (np.ones(12 * 30, dtype=float), np.ones(len(toolConfig.PARAM), dtype=float), float(-100),
+                     np.ones(12 * 30, dtype=float))
+                bit_a = pickle.dumps(a)
+                _tmp = [0]
+                for _ in range(self.capacity):
+                    _tmp.append(bit_a)
+                self.buffer = shared_memory.ShareableList(_tmp, name="rl_buffer")
+        else:
+            self.buffer = shared_memory.ShareableList(name="rl_buffer")
 
     def select_action(self, state):
         """
@@ -148,66 +159,50 @@ class DDPGAgent(ReLearningAgent):
             self.buffer.pop(0)
         self.buffer.append(transition)
 
-    @classmethod
-    def save_once_buffer(cls, *transition):
-        logging.debug("Load buffer and put transition")
+    def put_once_buffer(self, *transition):
+        _index = self.buffer[0]
+        if _index > self.capacity - 2:
+            _index = 1
+        pik_data = pickle.dumps(transition)
+        # notify
+        if self.device == 0:
+            logging.debug(f"Item add to buffer: {_index} - {len(pik_data)}")
+        # new data
+        self.buffer[_index + 1] = pik_data
+        # change length
+        _index += 1
+        self.buffer[0] = _index
+
+    def load_buffer(self):
         if toolConfig.MODE == "PX4":
             pathfile = f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl"
         else:
             pathfile = f"{toolConfig.BUFFER_PATH}/Ardupilot/buffer.pkl"
+        if not os.path.exists(pathfile):
+            return None
 
-        # read local buffer file
-        if os.path.exists(pathfile):
-            with open(pathfile, "ab+") as fp:
-                fcntl.flock(fp, fcntl.LOCK_EX)
-                pik_data = pickle.dumps(transition)
-                fp.write(pik_data)
-                # line flag
-                fp.write(b";;\n")
-                fcntl.flock(fp, fcntl.LOCK_UN)
-        else:
-            with open(pathfile, "ab+") as fp:
-                pik_data = pickle.dumps(transition)
-                fp.write(pik_data)
-                # line flag
-                fp.write(b";;\n")
-            # with open(pathfile, "ab+") as fp:
-            #     fcntl.flock(fp, fcntl.LOCK_EX)
-            #     pik_data = pickle.dumps(transition)
-            #     fp.write(pik_data)
-            #     # line flag
-            #     fp.write(b";;\n")
-            #     fcntl.flock(fp, fcntl.LOCK_UN)
-
-    @classmethod
-    def load_buffer(cls):
-        raw_datas = []
-        if toolConfig.MODE == "PX4":
-            pathfile = f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl"
-        else:
-            pathfile = f"{toolConfig.BUFFER_PATH}/Ardupilot/buffer.pkl"
-        # lock = fl.FileLock(pathfile)
-        # lock.acquire(timeout=3)
-        # with open(pathfile, "rb") as fp:
-        #     tmp_obj = fp.read()
-        # lock.release()
-        # # binary split with flag b";;\n"
-        # tmp_obj_array = tmp_obj.split(b";;\n")
-        # for item in tmp_obj_array:
-        #     if len(item) > 10:
-        #         raw_datas.append(pickle.loads(item))
-        while os.path.exists(pathfile) and not os.access(pathfile, os.R_OK):
+        while not os.access(pathfile, os.R_OK):
             continue
         with open(pathfile, "rb") as fp:
-            fcntl.flock(fp, fcntl.LOCK_EX)
-            tmp_obj = fp.read()
-            fcntl.flock(fp, fcntl.LOCK_UN)
-        # binary split with flag b";;\n"
-        tmp_obj_array = tmp_obj.split(b";;\n")
-        for item in tmp_obj_array:
-            if len(item) > 10:
-                raw_datas.append(pickle.loads(item))
-        return raw_datas
+            # fcntl.flock(fp, fcntl.LOCK_EX)
+            _buffer = pickle.load(fp)
+            # fcntl.flock(fp, fcntl.LOCK_UN)
+        return shared_memory.ShareableList(_buffer, name="rl_buffer")
+
+    def save_buffer(self):
+        if toolConfig.MODE == "PX4":
+            pathfile = f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl"
+        else:
+            pathfile = f"{toolConfig.BUFFER_PATH}/Ardupilot/buffer.pkl"
+        _tmp_file = []
+        for i in range(self.capacity):
+            _tmp_file.append(self.buffer[i])
+        while os.path.exists(pathfile) and not os.access(pathfile, os.R_OK):
+            continue
+        with open(pathfile, "wb") as fp:
+            # fcntl.flock(fp, fcntl.LOCK_EX)
+            pickle.dump(_tmp_file, fp)
+            # fcntl.flock(fp, fcntl.LOCK_UN)
 
     def learn(self):
         """
@@ -215,15 +210,21 @@ class DDPGAgent(ReLearningAgent):
         @return:
         """
         # Load buffer
-        self.buffer = self.load_buffer()
+        # self.buffer = self.load_buffer()
         # return if buffer is too small
-        if len(self.buffer) < self.batch_size:
-            logging.debug(f"Current buffer size is {len(self.buffer)}, skip.")
+        if self.buffer[0] < self.batch_size:
+            logging.debug(f"Current buffer size is {self.buffer[0]}, skip.")
+            return False
+        if self.buffer[0] % self.batch_size > 10:
             return False
 
         logging.info(f"Take example and learn, example/buffer size: {self.batch_size}/{len(self.buffer)}.")
+        # restore
+        _tmp_buffer = []
+        for i in range(self.buffer[0]):
+            _tmp_buffer.append(pickle.loads(self.buffer[i + 1]))
         # take a sample
-        samples = random.sample(self.buffer, self.batch_size)
+        samples = random.sample(_tmp_buffer, self.batch_size)
         # tuple input
         state_current, action, reward, state_result = zip(*samples)
 
@@ -271,32 +272,6 @@ class DDPGAgent(ReLearningAgent):
         else:
             filepath = "model/Ardupilot"
 
-        # if self.device == 0 and os.path.exists(f"{filepath}/actor.pth"):
-        #     lock1 = fl.FileLock(f"{filepath}/actor.pth")
-        #     lock2 = fl.FileLock(f"{filepath}/critic.pth")
-        #     lock3 = fl.FileLock(f"{filepath}/actor_target.pth")
-        #     lock4 = fl.FileLock(f"{filepath}/critic_target.pth")
-        #
-        #     lock1.acquire(timeout=5)
-        #     lock2.acquire(timeout=5)
-        #     lock3.acquire(timeout=5)
-        #     lock4.acquire(timeout=5)
-        #
-        #     torch.save(self.actor, f"{filepath}/actor.pth")
-        #     torch.save(self.critic, f"{filepath}/critic.pth")
-        #     torch.save(self.actor_target, f"{filepath}/actor_target.pth")
-        #     torch.save(self.critic_target, f"{filepath}/critic_target.pth")
-        #
-        #     lock1.release()
-        #     lock2.release()
-        #     lock3.release()
-        #     lock4.release()
-        # else:
-        #     torch.save(self.actor, f"{filepath}/actor.pth")
-        #     torch.save(self.critic, f"{filepath}/critic.pth")
-        #     torch.save(self.actor_target, f"{filepath}/actor_target.pth")
-        #     torch.save(self.critic_target, f"{filepath}/critic_target.pth")
-
         with open(f"{filepath}/actor.pth", "wb") as fp1, \
                 open(f"{filepath}/critic.pth", "wb") as fp2, \
                 open(f"{filepath}/actor_optimizer.pth", "wb") as fp3, \
@@ -316,40 +291,11 @@ class DDPGAgent(ReLearningAgent):
             fcntl.flock(fp3, fcntl.LOCK_UN)
             fcntl.flock(fp4, fcntl.LOCK_UN)
 
-        # if self.device == 0 and ext is not None:
-        #     ext = int(ext)
-        #     torch.save(self.actor, f"{filepath}/his/actor{ext}.pth")
-        #     torch.save(self.critic, f"{filepath}/his/critic{ext}.pth")
-        #     torch.save(self.actor_target, f"{filepath}/his/actor_targe{ext}.pth")
-        #     torch.save(self.critic_target, f"{filepath}/his/critic_target{ext}.pth")
-
     def check_point(self):
         if toolConfig.MODE == "PX4":
             filepath = "model/PX4"
         else:
             filepath = "model/Ardupilot"
-
-        # if not os.path.exists(f"{filepath}/actor.pth"):
-        #     return
-        # lock1 = fl.FileLock(f"{filepath}/actor.pth")
-        # lock2 = fl.FileLock(f"{filepath}/critic.pth")
-        # lock3 = fl.FileLock(f"{filepath}/actor_target.pth")
-        # lock4 = fl.FileLock(f"{filepath}/critic_target.pth")
-        #
-        # lock1.acquire(timeout=5)
-        # lock2.acquire(timeout=5)
-        # lock3.acquire(timeout=5)
-        # lock4.acquire(timeout=5)
-        #
-        # self.actor = torch.load(f"{filepath}/actor.pth")
-        # self.critic = torch.load(f"{filepath}/critic.pth")
-        # self.actor_target = torch.load(f"{filepath}/actor_target.pth")
-        # self.critic_target = torch.load(f"{filepath}/critic_target.pth")
-        #
-        # lock1.release()
-        # lock2.release()
-        # lock3.release()
-        # lock4.release()
 
         if os.path.exists(f"{filepath}/actor.pth"):
 
@@ -385,6 +331,7 @@ class DDPGAgent(ReLearningAgent):
         logging.info("Load previous model.")
 
     def train_from_incorrent(self, param_file):
+        run_round = 1
         while True:
             try:
                 time.sleep(1)
@@ -398,7 +345,7 @@ class DDPGAgent(ReLearningAgent):
                     continue
 
                 # other device should load model at first
-                if self.device != 0:
+                if self.device != 0 and run_round % 32 == 0:
                     self.check_point()
                 small_deviation = 0
                 previous_deviation = 0
@@ -407,7 +354,7 @@ class DDPGAgent(ReLearningAgent):
                     if not self.env.manager.mav_monitor.msg_queue.empty():
                         self.env.manager.mav_monitor.msg_queue.get(block=True)
                         break
-                    if small_deviation > 10:
+                    if small_deviation > 6:
                         break
 
                     # observe
@@ -439,22 +386,32 @@ class DDPGAgent(ReLearningAgent):
                         self.save_point()
                         break
                     # state - action save to buffer
-                    self.save_once_buffer(cur_state, action_0, reward, obe_state)
+                    self.put_once_buffer(cur_state, action_0, reward, obe_state)
 
                     # only device 0 is learning other device provides buffer
                     if int(self.device) == 0:
                         if not self.learn():
                             continue
-                        self.save_point()
+                        else:
+                            self.save_point()
+                            self.save_buffer()
+
+                    # index +1
+                    run_round += 1
 
             except KeyboardInterrupt:
                 if int(self.device) == 0:
                     self.save_point()
+                    self.save_buffer()
+
+                if int(self.device) == 0:
+                    self.buffer.shm.close()
+                    self.buffer.shm.unlink()
+                self.env.close_env()
                 operation = input("Any key to exit...")
                 if operation == "c":
                     continue
                 else:
-                    self.env.close_env()
                     return
             except Exception as e:
                 exc_type, exc_obj, exc_tb = sys.exc_info()

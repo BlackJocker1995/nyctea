@@ -78,7 +78,7 @@ class SimManager:
         if toolConfig.SIM == 'Jmavsim':
             port = 4560 + int(drone_i)
             cmd = f'{toolConfig.JMAVSIM_PATH} -p {port} -l'
-        self._sim_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_RUN_PATH, timeout=30, encoding='utf-8')
+        self._sim_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_PATH, timeout=30, encoding='utf-8')
         logging.debug("Init px4 Jmavsim description.")
 
     def start_sitl(self):
@@ -121,8 +121,8 @@ class SimManager:
             self._sitl_task = pexpect.spawn(cmd, cwd=toolConfig.ARDUPILOT_LOG_PATH, timeout=30, encoding='utf-8')
 
         if toolConfig.MODE == "PX4":
-            if os.path.exists(f"{toolConfig.PX4_RUN_PATH}/build/px4_sitl_default/tmp/rootfs/eeprom/parameters_10016"):
-                os.remove(f"{toolConfig.PX4_RUN_PATH}/build/px4_sitl_default/tmp/rootfs/eeprom/parameters_10016")
+            if os.path.exists(f"{toolConfig.PX4_PATH}/build/px4_sitl_default/tmp/rootfs/eeprom/parameters_10016"):
+                os.remove(f"{toolConfig.PX4_PATH}/build/px4_sitl_default/tmp/rootfs/eeprom/parameters_10016")
 
                 if toolConfig.HOME is None:
                     pre_argv = f"PX4_HOME_LAT=-35.362758 " \
@@ -139,7 +139,7 @@ class SimManager:
                     cmd = f'make {pre_argv} px4_sitl_default none_iris'
                 if toolConfig.SIM == 'Jmavsim':
                     cmd = f"make {pre_argv} px4_sitl_default jmavsim"
-            self._sitl_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_RUN_PATH, timeout=30, encoding='utf-8')
+            self._sitl_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_PATH, timeout=30, encoding='utf-8')
             logging.info(f"Start {toolConfig.MODE} --> [{toolConfig.SIM}]")
 
     # def start_SITL_from_bin(self):
@@ -181,15 +181,15 @@ class SimManager:
         if toolConfig.MODE == 'PX4':
 
             if os.path.exists(
-                    f"{toolConfig.PX4_RUN_PATH}/build/px4_sitl_default/instance_{drone_i}/eeprom/parameters_10016") \
+                    f"{toolConfig.PX4_PATH}/build/px4_sitl_default/instance_{drone_i}/eeprom/parameters_10016") \
                     and toolConfig.MODE == "PX4":
                 os.remove(
-                    f"{toolConfig.PX4_RUN_PATH}/build/px4_sitl_default/instance_{drone_i}/eeprom/parameters_10016")
+                    f"{toolConfig.PX4_PATH}/build/px4_sitl_default/instance_{drone_i}/eeprom/parameters_10016")
 
             if toolConfig.SIM == 'Jmavsim':
-                cmd = f"{toolConfig.PX4_RUN_PATH}/Tools/sitl_multiple_run_single.sh {drone_i}"
+                cmd = f"{toolConfig.PX4_PATH}/Tools/sitl_multiple_run_single.sh {drone_i}"
 
-            self._sitl_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_RUN_PATH, timeout=30, encoding='utf-8')
+            self._sitl_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_PATH, timeout=30, encoding='utf-8')
 
         logging.info(f"Start {toolConfig.MODE} --> [{toolConfig.SIM} - {drone_i}]")
 
