@@ -398,7 +398,6 @@ class DDPGAgent(ReLearningAgent):
 
                     # index +1
                     run_round += 1
-
             except KeyboardInterrupt:
                 if int(self.device) == 0:
                     self.save_point()
@@ -413,14 +412,14 @@ class DDPGAgent(ReLearningAgent):
                     continue
                 else:
                     return
-            except Exception as e:
-                exc_type, exc_obj, exc_tb = sys.exc_info()
-                frame = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                # self.save_point()
-                logging.info(f"Exception: {exc_type}, {frame}, {exc_tb.tb_lineno}, {e}.")
-                send_notice(self.device, self.buffer_length, [frame, exc_tb.tb_lineno, e])
-                input("Any key to continue...")
-                continue
+            # except Exception as e:
+            #     exc_type, exc_obj, exc_tb = sys.exc_info()
+            #     frame = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            #     # self.save_point()
+            #     logging.info(f"Exception: {exc_type}, {frame}, {exc_tb.tb_lineno}, {e}.")
+            #     send_notice(self.device, self.buffer_length, [frame, exc_tb.tb_lineno, e])
+            #     input("Any key to continue...")
+            #     continue
 
     def online_bin_monitor_rl(self):
         action_num = 0

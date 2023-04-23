@@ -86,7 +86,7 @@ class BoardMavlink(multiprocessing.Process):
             ray.get(threat_manage)
             ray.shutdown()
         else:
-            cls.extract_log_path_threat(cls, log_path, file_list, keep_des, skip)
+            cls.extract_log_path_single(log_path, file_list, keep_des, skip)
 
     @abstractmethod
     def run(self):
@@ -100,6 +100,28 @@ class BoardMavlink(multiprocessing.Process):
     @classmethod
     @ray.remote
     def extract_log_path_threat(cls, log_path, file_list, keep_des, skip):
+        """
+        threat method to extract data from log.
+        :param log_path:
+        :param file_list:
+        :param keep_des: whether keep desired value of ATT and RATE
+        :param skip:
+        :return:
+        """
+        for file in tqdm(file_list):
+            name, _ = file.split('.')
+            if skip and os.path.exists(f'{log_path}/csv/{name}.csv'):
+                continue
+            try:
+                csv_data = cls.extract_log_file(f'{log_path}/{file}', keep_des)
+                csv_data.to_csv(f'{log_path}/csv/{name}.csv', index=False)
+            except Exception as e:
+                logging.warning(f"Error processing {file} : {e}")
+                continue
+        return True
+
+    @classmethod
+    def extract_log_path_single(cls, log_path, file_list, keep_des, skip):
         """
         threat method to extract data from log.
         :param log_path:
@@ -455,11 +477,16 @@ class BoardMavlinkPX4(BoardMavlink):
     def read_status_patch_ulg(self, time_last):
         time_last = float(time_last)
 
-        bias = pd.DataFrame(self.flight_log.get_dataset('estimator_sensor_bias').data)[["timestamp", "accel_bias[0]",
-                                                                                        "accel_bias[1]",
-                                                                                        "accel_bias[2]"]]
-        bias.columns = ["TimeS", "BiasA", "BiasB", "BiasC"]
-        bias = bias[bias["TimeS"] > time_last]
+        acc_bias = pd.DataFrame(self.flight_log.get_dataset('estimator_sensor_bias').data)[["timestamp",
+                                                                                            "accel_bias[0]",
+                                                                                            "accel_bias[1]",
+                                                                                            "accel_bias[2]"]]
+        att_bias = pd.DataFrame(self.flight_log.get_dataset('estimator_status').data)[["timestamp",
+                                                                                       "output_tracking_error[0]"]]
+        acc_bias.columns = ["TimeS", "BiasA", "BiasB", "BiasC"]
+        att_bias.columns = ["TimeS", "BiasD"]
+        acc_bias = acc_bias[acc_bias["TimeS"] > time_last]
+        att_bias = att_bias[att_bias["TimeS"] > time_last]
 
         att = pd.DataFrame(self.flight_log.get_dataset('vehicle_attitude_setpoint').data)[["timestamp",
                                                                                            "roll_body", "pitch_body",
@@ -490,7 +517,7 @@ class BoardMavlinkPX4(BoardMavlink):
         # vibe = vibe[vibe["TimeS"] > time_last]
 
         # Merge values
-        pd_array = pd.concat([att, rate, acc_gyr, bias]).sort_values(by='TimeS')
+        pd_array = pd.concat([att, rate, acc_gyr, acc_bias, att_bias]).sort_values(by='TimeS')
         pd_array["TimeS"] = pd_array["TimeS"] / 1000000
 
         # Process
@@ -518,13 +545,17 @@ class BoardMavlinkPX4(BoardMavlink):
         :param keep_des:
         :return:
         """
-
-        ulog = ULog(log_file)
+        include = ['estimator_sensor_bias', 'vehicle_attitude_setpoint', 'vehicle_rates_setpoint', 'sensor_combined',
+                   "estimator_status"]
+        ulog = ULog(log_file, message_name_filter_list=include)
 
         if keep_des:
-            bias = pd.DataFrame(ulog.get_dataset('estimator_sensor_bias').data)[["timestamp", "accel_bias[0]",
-                                                                                 "accel_bias[1]", "accel_bias[2]"]]
-            bias.columns = ["TimeS", "BiasA", "BiasB", "BiasC"]
+            acc_bias = pd.DataFrame(ulog.get_dataset('estimator_sensor_bias').data)[["timestamp", "accel_bias[0]",
+                                                                                     "accel_bias[1]", "accel_bias[2]"]]
+            att_bias = pd.DataFrame(ulog.get_dataset('estimator_status').data)[["timestamp",
+                                                                                "output_tracking_error[0]"]]
+            acc_bias.columns = ["TimeS", "BiasA", "BiasB", "BiasC"]
+            att_bias.columns = ["TimeS", "BiasD"]
 
         att = pd.DataFrame(ulog.get_dataset('vehicle_attitude_setpoint').data)[["timestamp",
                                                                                 "roll_body", "pitch_body", "yaw_body"]]
@@ -535,8 +566,8 @@ class BoardMavlinkPX4(BoardMavlink):
                                                                           "accelerometer_m_s2[0]",
                                                                           "accelerometer_m_s2[1]",
                                                                           "accelerometer_m_s2[2]"]]
-        mag = pd.DataFrame(ulog.get_dataset('sensor_mag').data)[["timestamp", "x", "y", "z"]]
-        vibe = pd.DataFrame(ulog.get_dataset('sensor_accel').data)[["timestamp", "x", "y", "z"]]
+        # mag = pd.DataFrame(ulog.get_dataset('sensor_mag').data)[["timestamp", "x", "y", "z"]]
+        # vibe = pd.DataFrame(ulog.get_dataset('sensor_accel').data)[["timestamp", "x", "y", "z"]]
         # Param
         param = pd.Series(ulog.initial_parameters)
         param = param[toolConfig.PARAM]
@@ -548,13 +579,13 @@ class BoardMavlinkPX4(BoardMavlink):
         att.columns = ["TimeS", "Roll", "Pitch", "Yaw"]
         rate.columns = ["TimeS", "RateRoll", "RatePitch", "RateYaw"]
         acc_gyr.columns = ["TimeS", "GyrX", "GyrY", "GyrZ", "AccX", "AccY", "AccZ"]
-        mag.columns = ["TimeS", "MagX", "MagY", "MagZ"]
-        vibe.columns = ["TimeS", "VibeX", "VibeY", "VibeZ"]
+        # mag.columns = ["TimeS", "MagX", "MagY", "MagZ"]
+        # vibe.columns = ["TimeS", "VibeX", "VibeY", "VibeZ"]
         # Merge values
         if keep_des:
-            pd_array = pd.concat([att, rate, acc_gyr, mag, vibe, bias]).sort_values(by='TimeS')
+            pd_array = pd.concat([att, rate, acc_gyr, acc_bias, att_bias]).sort_values(by='TimeS')
         else:
-            pd_array = pd.concat([att, rate, acc_gyr, mag, vibe]).sort_values(by='TimeS')
+            pd_array = pd.concat([att, rate, acc_gyr]).sort_values(by='TimeS')
 
         pd_array['TimeS'] = pd_array['TimeS'] / 1000000
         # Process
@@ -580,7 +611,7 @@ class BoardMavlinkPX4(BoardMavlink):
         time_last = 0
         _file = open(self.log_file_path, 'rb')
         include = ['estimator_sensor_bias', 'vehicle_attitude_setpoint', 'vehicle_rates_setpoint', 'sensor_combined',
-                   'sensor_mag', 'sensor_accel']
+                   "estimator_status"]
         while True:
             time.sleep(2)
             # Flush write buffer

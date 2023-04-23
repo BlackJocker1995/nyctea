@@ -22,7 +22,7 @@ class ToolConfig:
         # Simulation Speed
         self.__dict__["SPEED"] = 3
         # Flight home (None, AVC_plane)
-        self.__dict__["HOME"] = "AVC_plane"  # "AVC_plane"
+        self.__dict__["HOME"] = "AVC_plane"
         # Output Debug Message
         self.__dict__["DEBUG"] = True
         # Wind Speed range
@@ -129,9 +129,9 @@ class ToolConfig:
             self.__dict__["PX4_LOG_PATH"] = f"{self.__dict__['PX4_PATH']}/build/px4_sitl_default/logs/{now_time}"
             # Status Order
             self.__dict__["STATUS_ORDER"] = ['TimeS', 'Roll', 'Pitch', 'Yaw', 'RateRoll', 'RatePitch', 'RateYaw',
-                                             'BiasA', 'BiasB', 'BiasC',
-                                             'AccX', 'AccY', 'AccZ', 'GyrX', 'GyrY', 'GyrZ',
-                                             'MagX', 'MagY', 'MagZ', 'VibeX', 'VibeY', 'VibeZ']
+                                             'BiasA', 'BiasB', 'BiasC', 'BiasD',
+                                             'AccX', 'AccY', 'AccZ', 'GyrX', 'GyrY', 'GyrZ']
+                                             #'MagX', 'MagY', 'MagZ', 'VibeX', 'VibeY', 'VibeZ']
 
             with open('Cptool/param_px4.json', 'r') as f:
                 param_name = pd.DataFrame(json.loads(f.read())).columns.tolist()

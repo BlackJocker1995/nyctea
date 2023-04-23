@@ -89,8 +89,8 @@ class DroneEnv:
         @return: achieved state, deviation
         """
         if toolConfig.MODE == "PX4":
-            bias = pd_state[['BiasA', 'BiasB', 'BiasC']]
-            out_state = pd_state.drop(['TimeS', 'BiasA', 'BiasB', 'BiasC'], axis=1)
+            bias = pd_state[['BiasA', 'BiasB', 'BiasC', 'BiasD']]
+            out_state = pd_state.drop(['TimeS', 'BiasA', 'BiasB', 'BiasC', 'BiasD'], axis=1)
             deviation = np.array(bias)
         else:
             desired_state = pd_state[['DesRoll', 'DesPitch', 'DesYaw', 'DesRateRoll', 'DesRatePitch', 'DesRateYaw']]
@@ -99,7 +99,8 @@ class DroneEnv:
                                        'DesRateRoll', 'DesRatePitch', 'DesRateYaw'], axis=1)
             deviation = np.radians(desired_state.values - achieved_state.values)
         # observed deviation
-        deviation = abs(deviation.sum())
+
+        deviation = (np.abs(deviation)).sum()
 
         return out_state, deviation
 
@@ -110,7 +111,8 @@ class DroneEnv:
         # if alive, close
         if self.manager is not None:
             self.close_env()
-            self.manager.board_mavlink.delete_current_log(self.device)
+            if delete_log:
+                self.manager.board_mavlink.delete_current_log(self.device)
             del self.manager
         # Manager
         self.manager = FixSimManager(self.debug)
