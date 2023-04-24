@@ -68,7 +68,7 @@ class ReLearningAgent():
         """
         step_increase = (action * (self.sub_value_range[:, 1] - self.sub_value_range[:, 0])
                          // self.step_unit) * self.step_unit
-        return self.sub_value_range[:, 0] + step_increase
+        return np.array(self.sub_value_range[:, 0] + step_increase, dtype=float)
 
     @abstractmethod
     def save_point(self):
@@ -106,7 +106,7 @@ class DDPGAgent(ReLearningAgent):
 
         # Buffer length
         self.buffer_length = 0
-        self.buffer = []
+        self.buffer = None
 
         # actor network
         self.actor = Actor(state_shape, 256, action_dim)
@@ -130,17 +130,17 @@ class DDPGAgent(ReLearningAgent):
             except Exception as e:
                 pass
             self.buffer = self.load_buffer()
-            # None and create
             if self.buffer is None:
-
                 # destroy the shared memory
-                a = (np.ones(12 * 30, dtype=float), np.ones(len(toolConfig.PARAM), dtype=float), float(-100),
-                     np.ones(12 * 30, dtype=float))
+                a = (np.ones(12 * 20, dtype=float), np.ones(len(toolConfig.PARAM), dtype=float),
+                     float(-101), np.ones(12 * 20, dtype=float))
                 bit_a = pickle.dumps(a)
                 _tmp = [0]
                 for _ in range(self.capacity):
                     _tmp.append(bit_a)
                 self.buffer = shared_memory.ShareableList(_tmp, name="rl_buffer")
+            # self.restore_buffer()
+            # None and create
         else:
             self.buffer = shared_memory.ShareableList(name="rl_buffer")
 
@@ -160,18 +160,40 @@ class DDPGAgent(ReLearningAgent):
         self.buffer.append(transition)
 
     def put_once_buffer(self, *transition):
+        # others thread wait first 0 thread loading data at first.
+        if self.device != 0:
+            while self.buffer[0] == 0:
+                continue
+        # load current index
         _index = self.buffer[0]
-        if _index > self.capacity - 2:
-            _index = 1
+        # over capacity
+        if _index > self.capacity - 3:
+            self.buffer[0] = 0
+        # to bytes
         pik_data = pickle.dumps(transition)
         # notify
-        if self.device == 0:
-            logging.debug(f"Item add to buffer: {_index} - {len(pik_data)}")
-        # new data
-        self.buffer[_index + 1] = pik_data
-        # change length
-        _index += 1
-        self.buffer[0] = _index
+        logging.debug(f"Item add to buffer: {_index} - len:{len(pik_data)}")
+        # add new data
+        self.buffer[self.buffer[0] + 1] = pik_data
+        self.buffer[0] += 1
+
+    def restore_buffer(self):
+        if toolConfig.MODE == "PX4":
+            pathfile = f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl"
+        else:
+            pathfile = f"{toolConfig.BUFFER_PATH}/Ardupilot/buffer.pkl"
+        if not os.path.exists(pathfile):
+            return None
+        # wait for read
+        while not os.access(pathfile, os.R_OK):
+            continue
+        with open(pathfile, "rb") as fp:
+            # fcntl.flock(fp, fcntl.LOCK_EX)
+            _buffer = pickle.load(fp)
+            # fcntl.flock(fp, fcntl.LOCK_UN)
+
+        for i in range(_buffer[0]):
+            self.buffer[i] = _buffer[i]
 
     def load_buffer(self):
         if toolConfig.MODE == "PX4":
@@ -194,6 +216,10 @@ class DDPGAgent(ReLearningAgent):
             pathfile = f"{toolConfig.BUFFER_PATH}/PX4/buffer.pkl"
         else:
             pathfile = f"{toolConfig.BUFFER_PATH}/Ardupilot/buffer.pkl"
+        # return
+        if self.buffer[0] == 0:
+            return
+        # save all content
         _tmp_file = []
         for i in range(self.capacity):
             _tmp_file.append(self.buffer[i])
@@ -212,17 +238,20 @@ class DDPGAgent(ReLearningAgent):
         # Load buffer
         # self.buffer = self.load_buffer()
         # return if buffer is too small
-        if self.buffer[0] < self.batch_size:
+        if self.buffer[0] <= self.batch_size:
             logging.debug(f"Current buffer size is {self.buffer[0]}, skip.")
             return False
         if self.buffer[0] % self.batch_size > 10:
             return False
 
-        logging.info(f"Take example and learn, example/buffer size: {self.batch_size}/{len(self.buffer)}.")
+        logging.info(f"Take example and learn, example/buffer size: {self.batch_size}/{self.buffer[0]}.")
         # restore
         _tmp_buffer = []
-        for i in range(self.buffer[0]):
-            _tmp_buffer.append(pickle.loads(self.buffer[i + 1]))
+        for i in range(self.buffer[0]-1):
+            content = pickle.loads(self.buffer[i + 1])
+            if content[2] < -100:
+                continue
+            _tmp_buffer.append(content)
         # take a sample
         samples = random.sample(_tmp_buffer, self.batch_size)
         # tuple input
@@ -385,8 +414,12 @@ class DDPGAgent(ReLearningAgent):
                     if done:
                         self.save_point()
                         break
+                    # print(cur_state.dtype, action_0.dtype, obe_state.dtype)
                     # state - action save to buffer
-                    self.put_once_buffer(cur_state, action_0, reward, obe_state)
+                    cur_state = cur_state.astype(float)
+                    action_0 = action_0.astype(float)
+                    obe_state = obe_state.astype(float)
+                    self.put_once_buffer(cur_state, action_0, float(reward), obe_state)
 
                     # only device 0 is learning other device provides buffer
                     if int(self.device) == 0:

@@ -22,7 +22,7 @@ class ToolConfig:
         # Simulation Speed
         self.__dict__["SPEED"] = 3
         # Flight home (None, AVC_plane)
-        self.__dict__["HOME"] = "AVC_plane"
+        self.__dict__["HOME"] = None # "AVC_plane"
         # Output Debug Message
         self.__dict__["DEBUG"] = True
         # Wind Speed range
@@ -190,7 +190,7 @@ class ToolConfig:
 
 
 toolConfig = ToolConfig()
-toolConfig.select_mode("PX4")
+toolConfig.select_mode("Ardupilot")
 
 # toolConfig.PARAM = [
 #     "PSC_POSXY_P",
