@@ -44,6 +44,8 @@ class BoardMavlink(multiprocessing.Process):
                     time.sleep(0.1)
             # capture a data
             states, timestamp = self.data_segments.get()
+            if states is None:
+                raise ValueError("Can not read segment from log file anymore.")
             pd_array = pd.DataFrame(states)
             # only capture last tail_n vector
             pd_array = pd_array.tail(tail_n)
@@ -529,7 +531,7 @@ class BoardMavlinkPX4(BoardMavlink):
         return df_array
 
     def delete_current_log(self, device=None):
-        if os.path.exists(self.log_file_path):
+        if self.log_file_path is not None and os.path.exists(self.log_file_path):
             os.remove(self.log_file_path)
 
     @classmethod
@@ -612,8 +614,13 @@ class BoardMavlinkPX4(BoardMavlink):
         _file = open(self.log_file_path, 'rb')
         include = ['estimator_sensor_bias', 'vehicle_attitude_setpoint', 'vehicle_rates_setpoint', 'sensor_combined',
                    "estimator_status"]
+        failure_num = 0
         while True:
             time.sleep(2)
+            # if always fail
+            if failure_num > 5:
+                self.data_segments.put([None, round(time_last / 1000000, 1)])
+
             # Flush write buffer
             _file.flush()
             # Load current log file
@@ -626,7 +633,10 @@ class BoardMavlinkPX4(BoardMavlink):
                 status_data = self.read_status_patch_ulg(time_last)
                 if status_data is False:
                     logging.debug("Reading status failure, try again.")
+                    failure_num += 1
                     continue
+                else:
+                    failure_num = 0
                 # send this message
                 # print(status_data.shape, round(time_last / 1000000, 1))
                 self.data_segments.put([status_data, round(time_last / 1000000, 1)])

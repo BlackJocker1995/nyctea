@@ -73,6 +73,7 @@ class MonitorFlight(multiprocessing.Process):
             else:
                 loader.load('Cptool/fitCollection.txt')
         #
+
         lpoint1 = Location(loader.wpoints[0])
         lpoint2 = Location(loader.wpoints[1])
         pre_location = Location(loader.wpoints[0])
@@ -131,13 +132,13 @@ class MonitorFlight(multiprocessing.Process):
                     lpoint2 = Location(loader.wpoints[position_msg.seq])
 
                     # Start Check
-                    if int(position_msg.seq) == 2:
+                    if int(position_msg.seq) >= 2:
                         start_check = True
-                    if int(position_msg.seq) == 1 and toolConfig.MODE == "PX4":
+                    if int(position_msg.seq) >= 1 and toolConfig.MODE == "PX4":
                         start_check = True
 
                     current_mission = int(position_msg.seq)
-                    if toolConfig.MODE == "PX4": # and int(position_msg.seq) == 5:
+                    if position_msg.seq >= loader.count()-1:
                         start_check = False
             elif position_msg is not None and position_msg.get_type() == "GLOBAL_POSITION_INT":
                 # print(position_msg)

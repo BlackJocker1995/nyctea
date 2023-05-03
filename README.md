@@ -68,29 +68,34 @@ Or you can manually run the simulation at first in {ARDUPILOT_LOG_PATH} to auto 
 
 The log path for PX4 is in `{PX4_Path}/build/px4_sitl_default/logs/`, which is no need to change.
 
-* SIM: simulation type.
+* MODE: 1. Ardupilot 2. PX4.
+* 
+* SPEED: simulation speed, 3 default.
+* 
+* HOME: 1. None, use the default location to start; 2. AVC, use AVC location and mission.
+
+* DEBUG: display debug information.
+
+* ARDUPILOT_LOG_PATH: Path to save the Ardupilot logs.
 
 * AIRSIM_PATH: if select airsim, you should set the execution path.
 
-* PX4_RUN_PATH: if select PX4, you should set the execution path.
+* PX4_PATH: if select PX4, you should set the execution path, like `xx/xx/PX4-Autopilot`.
 
-* PARAM: the parameter used in predictor.
+* ARDUPILOT_PATH: Ardupilot running path, e.g., xx/xx/Autopilot`.
 
-* PARAM_PART: the parameter that participate in fuzzing.
-
-* INPUT_LEN: input length of predictor.
+* BUFFER_PATH: 
 
 
-[//]: # (## Description)
 
-[//]: # ()
-[//]: # (`0.collect.py` start simulation to collect flight logs.)
+## Description
 
-[//]: # ()
-[//]: # (`1.trans_bin2csv.py` transform the bin file to csv.)
 
-[//]: # ()
-[//]: # (`2.extract_feature.py` extract feature from csv.)
+`0.train_ddpg.py` start reinforcement learning training.
+
+
+`1.fix_test.py` try to fix the unstable state.
+
 
 [//]: # ()
 [//]: # (`2.raw_split.py` split the test feature for further searcher.)

@@ -22,7 +22,7 @@ class ToolConfig:
         # Simulation Speed
         self.__dict__["SPEED"] = 3
         # Flight home (None, AVC_plane)
-        self.__dict__["HOME"] = None # "AVC_plane"
+        self.__dict__["HOME"] = "AVC_plane"
         # Output Debug Message
         self.__dict__["DEBUG"] = True
         # Wind Speed range
@@ -85,7 +85,7 @@ class ToolConfig:
             self.__dict__["OL_LOG_MAP"] = ['ATTITUDE', 'RAW_IMU', 'VIBRATION']  # 'GLOBAL_POSITION_INT'
             # Status Order
             self.__dict__["STATUS_ORDER"] = ['TimeS', 'Roll', 'Pitch', 'Yaw', 'RateRoll', 'RatePitch', 'RateYaw',
-                                        'DesRoll', 'DesPitch', 'DesYaw', 'DesRateRoll', 'DesRatePitch', 'DesRateYaw',
+                                            'DesRoll', 'DesPitch', 'DesYaw', 'DesRateRoll', 'DesRatePitch', 'DesRateYaw',
                                              'AccX', 'AccY', 'AccZ', 'GyrX', 'GyrY', 'GyrZ']
                                              #'MagX', 'MagY', 'MagZ', 'VibeX', 'VibeY', 'VibeZ']
 
@@ -147,10 +147,7 @@ class ToolConfig:
                 "MC_PITCHRATE_P",
                 "MC_ROLLRATE_P",
                 "MC_YAWRATE_P",
-                "MPC_TILTMAX_AIR",
                 "MIS_YAW_ERR",
-                "MPC_Z_VEL_MAX_DN",
-                "MPC_Z_VEL_MAX_UP",
                 "MPC_TKO_SPEED"
             ]
 

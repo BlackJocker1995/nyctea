@@ -8,9 +8,13 @@ from queue import Queue
 import numpy as np
 import pandas as pd
 import requests
-from matplotlib import pyplot as plt
+import scipy
+from matplotlib import pyplot as plt, mlab
 from numpy.lib.stride_tricks import sliding_window_view
 from pymavlink import mavutil, mavwp, mavextra
+from scipy.signal import savgol_filter
+from scipy.stats import norm
+
 from Cptool.config import toolConfig
 import sys, select, os
 
@@ -274,6 +278,39 @@ def draw_att_des_and_ach(pdarray, exec='pdf'):
         # plt.clf()
 
 
+def extract_log_file_des_and_ach(log_file):
+    """
+    extract log message form a bin file with att desired and achieved
+    :param log_file:
+    :return:
+    """
+
+    logs = mavutil.mavlink_connection(log_file)
+    # init
+    out_data = []
+
+    while True:
+        msg = logs.recv_match(type=["ATT"])
+        if msg is None:
+            break
+        out = {
+            'TimeS': msg.TimeUS / 1000000,
+            'Roll': msg.Roll,
+            'DesRoll': msg.DesRoll,
+            'Pitch': msg.Pitch,
+            'DesPitch': msg.DesPitch,
+            'Yaw': msg.Yaw,
+            'DesYaw': msg.DesYaw
+        }
+        out_data.append(out)
+
+    pd_array = pd.DataFrame(out_data)
+    # Switch sequence, fill,  and return
+    pd_array['TimeS'] = pd_array['TimeS'].round(1)
+    pd_array = pd_array.drop_duplicates(keep='first')
+    return pd_array
+
+
 def sort_result_detect_repair(result_time, detect_time, repair_time):
     """
     check whether the result is appear after detecting and repairing.
@@ -287,6 +324,9 @@ def sort_result_detect_repair(result_time, detect_time, repair_time):
     if result_time > detect_time:
         return "detect"
     return "miss"
+
+
+
 
 
 def send_notice(thread, buffer_len, content):

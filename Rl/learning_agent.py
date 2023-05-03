@@ -80,7 +80,7 @@ class ReLearningAgent():
 
 
 class DDPGAgent(ReLearningAgent):
-    def __init__(self, device=0):
+    def __init__(self, train=True, device=0):
         super().__init__()
         self.device = int(device)
         # play environment
@@ -129,20 +129,22 @@ class DDPGAgent(ReLearningAgent):
                 _shm.shm.unlink()
             except Exception as e:
                 pass
-            self.buffer = self.load_buffer()
-            if self.buffer is None:
-                # destroy the shared memory
-                a = (np.ones(12 * 20, dtype=float), np.ones(len(toolConfig.PARAM), dtype=float),
-                     float(-101), np.ones(12 * 20, dtype=float))
-                bit_a = pickle.dumps(a)
-                _tmp = [0]
-                for _ in range(self.capacity):
-                    _tmp.append(bit_a)
-                self.buffer = shared_memory.ShareableList(_tmp, name="rl_buffer")
+            if train:
+                self.buffer = self.load_buffer()
+                if self.buffer is None:
+                    # destroy the shared memory
+                    a = (np.ones(12 * 20, dtype=float), np.ones(len(toolConfig.PARAM), dtype=float),
+                         float(-101), np.ones(12 * 20, dtype=float))
+                    bit_a = pickle.dumps(a)
+                    _tmp = [0]
+                    for _ in range(self.capacity):
+                        _tmp.append(bit_a)
+                    self.buffer = shared_memory.ShareableList(_tmp, name="rl_buffer")
             # self.restore_buffer()
             # None and create
         else:
-            self.buffer = shared_memory.ShareableList(name="rl_buffer")
+            if train:
+                self.buffer = shared_memory.ShareableList(name="rl_buffer")
 
     def select_action(self, state):
         """
@@ -374,7 +376,7 @@ class DDPGAgent(ReLearningAgent):
                     continue
 
                 # other device should load model at first
-                if self.device != 0 and run_round % 32 == 0:
+                if self.device != 0 and run_round % 16 == 0:
                     self.check_point()
                 small_deviation = 0
                 previous_deviation = 0
@@ -390,7 +392,7 @@ class DDPGAgent(ReLearningAgent):
                     cur_state = self.env.catch_state()
                     if cur_state is None:
                         # Not catch a state
-                        continue
+                        break
                     logging.info(f"Observation deviation {self.env.cur_deviation}")
                     # break if the deviation is not change
                     if previous_deviation == self.env.cur_deviation:
@@ -404,6 +406,8 @@ class DDPGAgent(ReLearningAgent):
                         small_deviation += 1
                         # else keep flight
                         continue
+                    else:
+                        small_deviation = 0
                     logging.info("Deviation over threshold, start repair.")
                     # select action
                     action_0 = self.select_action(cur_state)
@@ -445,19 +449,20 @@ class DDPGAgent(ReLearningAgent):
                     continue
                 else:
                     return
-            # except Exception as e:
-            #     exc_type, exc_obj, exc_tb = sys.exc_info()
-            #     frame = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            #     # self.save_point()
-            #     logging.info(f"Exception: {exc_type}, {frame}, {exc_tb.tb_lineno}, {e}.")
-            #     send_notice(self.device, self.buffer_length, [frame, exc_tb.tb_lineno, e])
-            #     input("Any key to continue...")
-            #     continue
+            except Exception as e:
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                frame = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                # self.save_point()
+                logging.info(f"Exception: {exc_type}, {frame}, {exc_tb.tb_lineno}, {e}.")
+                # send_notice(self.device, self.buffer_length, [frame, exc_tb.tb_lineno, e])
+                # input("Any key to continue...")
+                continue
 
     def online_bin_monitor_rl(self):
         action_num = 0
+        small_deviation = 0
+        deviations_his = []
         while True:
-            deviations_his = []
             try:
                 time.sleep(1)
                 if not self.env.manager.mav_monitor.msg_queue.empty():
@@ -465,6 +470,8 @@ class DDPGAgent(ReLearningAgent):
                     if not self.env.manager.mav_monitor.msg_queue.empty():
                         manager_msg, _ = self.env.manager.mav_monitor.msg_queue.get(block=True)
                         return manager_msg, action_num, deviations_his
+                if small_deviation > 6:
+                    return "pass", action_num, deviations_his
 
                 cur_state = self.env.catch_state()
                 logging.info(f"Observation deviation {self.env.cur_deviation}")
@@ -481,6 +488,9 @@ class DDPGAgent(ReLearningAgent):
                     self.env.manager.online_mavlink.set_params(configuration)
                     action_num += 1
                     time.sleep(2)
+                    small_deviation = 0
+                else:
+                    small_deviation += 1
             except KeyboardInterrupt:
                 input("Any key to exit...")
                 return "timeout", action_num, deviations_his

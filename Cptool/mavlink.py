@@ -247,8 +247,11 @@ class DroneMavlink:
                                                -105.230575,
                                                0.000000)
         msg = self._master.recv_match(type=['COMMAND_ACK'], blocking=True, timeout=5)
-        logging.debug(f"Home set callback: {msg.command}")
-        return True
+        if msg is not None:
+            logging.debug(f"Home set callback: {msg.command}")
+            return True
+        else:
+            return False
 
     def gcs_msg_request(self):
         # If it requires manually send the gsc packets. (PX4)

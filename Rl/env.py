@@ -164,8 +164,7 @@ class DroneEnv:
             time.sleep(x)
         # set configuration
         self.manager.online_mavlink.set_params(self.current_incorrect_configuration)
-        # read check parameters
-        # self.manager.online_mavlink.get_params(toolConfig.PARAM_PART)
+
 
         logging.debug("Set parameters successfully.")
 
@@ -190,7 +189,6 @@ class DroneEnv:
         @param configuration: configuration
         @return:
         """
-        # 上传数据，然后观察下个segment 有没有减小，减的越多越好
         # Upload this configuration
         configuration = pd.DataFrame(configuration.reshape((-1, self.parameter_shape)),
                                      columns=toolConfig.PARAM).iloc[0].to_dict()
@@ -250,12 +248,17 @@ class DroneEnv:
         return next_state.to_numpy().reshape(-1), reward, finish
 
     def close_env(self):
-        self.try_kill_mavproxy()
-        self.manager.stop_sitl()
-        if toolConfig.MODE == "PX4":
-            self.manager.stop_sim()
-        self.manager.mav_monitor.terminate()
-        self.manager.board_mavlink.terminate()
+        try:
+            self.try_kill_mavproxy()
+            self.manager.stop_sitl()
+            if toolConfig.MODE == "PX4":
+                self.manager.stop_sim()
+            if self.manager.mav_monitor.is_alive():
+                self.manager.mav_monitor.terminate()
+            if self.manager.board_mavlink.is_alive():
+                self.manager.board_mavlink.terminate()
+        except Exception as e:
+            pass
         logging.debug("Stop previous simulation successfully.")
 
     def try_kill_mavproxy(self):
