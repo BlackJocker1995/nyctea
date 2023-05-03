@@ -69,9 +69,9 @@ Or you can manually run the simulation at first in {ARDUPILOT_LOG_PATH} to auto 
 The log path for PX4 is in `{PX4_Path}/build/px4_sitl_default/logs/`, which is no need to change.
 
 * MODE: 1. Ardupilot 2. PX4.
-* 
+
 * SPEED: simulation speed, 3 default.
-* 
+
 * HOME: 1. None, use the default location to start; 2. AVC, use AVC location and mission.
 
 * DEBUG: display debug information.
@@ -82,9 +82,8 @@ The log path for PX4 is in `{PX4_Path}/build/px4_sitl_default/logs/`, which is n
 
 * PX4_PATH: if select PX4, you should set the execution path, like `xx/xx/PX4-Autopilot`.
 
-* ARDUPILOT_PATH: Ardupilot running path, e.g., xx/xx/Autopilot`.
+* ARDUPILOT_PATH: Ardupilot running path, e.g., `xx/xx/Autopilot`.
 
-* BUFFER_PATH: 
 
 
 
