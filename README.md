@@ -100,12 +100,12 @@ The log path for PX4 is in `{PX4_Path}/build/px4_sitl_default/logs/`, which is n
 
 ### 1.Test Device
 
-![APM](fig/airsim.png) 
-![Jmavsim](fig/jmavsim.jpg)
-![Real Drone](fig/zd500.jpg)
+![APM](/fig/airsim.png) 
+![Jmavsim](/fig/jmavsim.jpg)
+![Real Drone](/fig/zd500.jpg)
 
 ### 2.Deviation Change Example
-![Ardupilot](fig/deviation_change.jpeg)
+![Ardupilot](/fig/deviation_change.jpeg)
 
 In most cases, the segment deviations gradually decreased when the new configurations were uploaded and further dropped 
 below the threshold after the first iteration, eventually stabilized at the fourth iteration. 
@@ -113,17 +113,17 @@ For some rare cases like Example-3, Nyctea may send a configuration causing adve
 The subsequent configurations can still rectify the segment deviation value moderately at the end. 
 Overall, our system reduces the instability of the drone to a reasonable level so that it can accomplish the mission properly.
 
-![PX4](fig/deviation_change_px4.jpeg)
+![PX4](/fig/deviation_change_px4.jpeg)
 
 The PX4 performed similarly to the Ardupilot, 
 and overall, the deviations all tended to decrease after several fixes.
 
 ### 3.Case
-![Ardupilot](fig/fix_thrust_roll.jpg)
+![Ardupilot](/fig/fix_thrust_roll.jpg)
 
-![Ardupilot](fig/fix_thrust_pitch.jpg)
+![Ardupilot](/fig/fix_thrust_pitch.jpg)
 
-![Ardupilot](fig/fix_thrust_yaw.jpg)
+![Ardupilot](/fig/fix_thrust_yaw.jpg)
 
 [//]: # ()
 [//]: # (`2.raw_split.py` split the test feature for further searcher.)
