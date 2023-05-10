@@ -290,25 +290,46 @@ def extract_log_file_des_and_ach(log_file):
     out_data = []
 
     while True:
-        msg = logs.recv_match(type=["ATT"])
+        msg = logs.recv_match(type=["ATT", "RATE"])
         if msg is None:
             break
-        out = {
-            'TimeS': msg.TimeUS / 1000000,
-            'Roll': msg.Roll,
-            'DesRoll': msg.DesRoll,
-            'Pitch': msg.Pitch,
-            'DesPitch': msg.DesPitch,
-            'Yaw': msg.Yaw,
-            'DesYaw': msg.DesYaw
-        }
+        if msg.get_type() == "ATT":
+            out = {
+                'TimeS': msg.TimeUS / 1000000,
+                'Roll': msg.Roll,
+                'DesRoll': msg.DesRoll,
+                'Pitch': msg.Pitch,
+                'DesPitch': msg.DesPitch,
+                'Yaw': msg.Yaw,
+                'DesYaw': msg.DesYaw
+            }
+        else:
+            out = {
+                'TimeS': msg.TimeUS / 1000000,
+                # deg to rad
+                'DesRateRoll': msg.RDes,
+                'RateRoll': msg.R,
+                'DesRatePitch': msg.PDes,
+                'RatePitch': msg.P,
+                'DesRateYaw': msg.YDes,
+                'RateYaw': msg.Y,
+            }
         out_data.append(out)
 
     pd_array = pd.DataFrame(out_data)
-    # Switch sequence, fill,  and return
     pd_array['TimeS'] = pd_array['TimeS'].round(1)
     pd_array = pd_array.drop_duplicates(keep='first')
-    return pd_array
+    # merge data in same TimeS
+    df_array = pd.DataFrame(columns=pd_array.columns)
+    for group, group_item in pd_array.groupby('TimeS'):
+        # filling
+        group_item = group_item.fillna(method='ffill')
+        group_item = group_item.fillna(method='bfill')
+        df_array.loc[len(df_array.index)] = group_item.mean()
+    # Drop nan
+    df_array = df_array.fillna(method='ffill')
+    df_array = df_array.dropna()
+    return df_array
 
 
 def sort_result_detect_repair(result_time, detect_time, repair_time):
