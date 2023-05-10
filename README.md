@@ -124,36 +124,3 @@ and overall, the deviations all tended to decrease after several fixes.
 ![Ardupilot](/fig/fix_thrust_pitch.jpg)
 
 ![Ardupilot](/fig/fix_thrust_yaw.jpg)
-
-[//]: # ()
-[//]: # (`2.raw_split.py` split the test feature for further searcher.)
-
-[//]: # ()
-[//]: # (`2.feature_split.py` split the csv data for train and test.)
-
-[//]: # ()
-[//]: # (`2.train_lstm.py` train a model predictor.)
-
-[//]: # ()
-[//]: # (`3.lgfuzzer.py` start the fuzzing test.)
-
-[//]: # ()
-[//]: # (`4.pre_validate.py` select candidates.)
-
-[//]: # ()
-[//]: # (`4.validate.py` validate configurations through simulator.)
-
-[//]: # ()
-[//]: # (If you want to validate with multiple simulator, you can use validate.py -- device {xxx} to start multiple SITL)
-
-[//]: # ()
-[//]: # (`4.validate_thread.py` validate configurations through multiple simulators, where use --thread {xx} to launch multiple tab validate.py)
-
-[//]: # ()
-[//]: # (Noted: For PX4,  `4.validate_px4_thread.py` will call the `4.validate_px4_thread_version.py`.)
-
-[//]: # (If you have no requirement for multiple thread, you should use `4.validate_thread_px4.py`)
-
-[//]: # ()
-[//]: # ()
-[//]: # (`5.range.py` summary range guideline by validated result.)
