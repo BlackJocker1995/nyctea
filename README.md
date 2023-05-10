@@ -120,7 +120,9 @@ and overall, the deviations all tended to decrease after several fixes.
 
 ### 3.Case
 ![Ardupilot](fig/fix_thrust_roll.jpg)
+
 ![Ardupilot](fig/fix_thrust_pitch.jpg)
+
 ![Ardupilot](fig/fix_thrust_yaw.jpg)
 
 [//]: # ()
