@@ -178,6 +178,7 @@ class MonitorFlight(multiprocessing.Process):
                     if c != 0:
                         p = (a + b + c) / 2
                         deviation_dis = 2 * math.sqrt(p * (p - a) * (p - b) * (p - c) + 0.01) / c
+                        print(C)
                     else:
                         deviation_dis = 0
                     # Is deviation ?

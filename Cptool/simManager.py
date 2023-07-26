@@ -188,6 +188,15 @@ class SimManager:
 
             if toolConfig.SIM == 'Jmavsim':
                 cmd = f"{toolConfig.PX4_PATH}/Tools/sitl_multiple_run_single.sh {drone_i}"
+                os.environ['PX4_SIM_SPEED_FACTOR'] = f"{toolConfig.SPEED}"
+                if toolConfig.HOME is None:
+                    os.environ['PX4_HOME_LAT'] = "-35.363261"
+                    os.environ['PX4_HOME_LON'] = "149.165230"
+                    os.environ['PX4_HOME_ALT'] = "583.730592"
+                else:
+                    os.environ['PX4_HOME_LAT'] = "40.072842"
+                    os.environ['PX4_HOME_LON'] = "-105.230575"
+                    os.environ['PX4_HOME_ALT'] = "0.000000"
 
             self._sitl_task = pexpect.spawn(cmd, cwd=toolConfig.PX4_PATH, timeout=30, encoding='utf-8')
 

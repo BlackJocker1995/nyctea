@@ -104,9 +104,9 @@ class DroneEnv:
 
         return out_state, deviation
 
-    def reset(self, delay=True, delete_log=False):
+    def init_drone_env(self, delete_log=False):
         """
-        Reset Environment
+        Init flight Environment
         """
         # if alive, close
         if self.manager is not None:
@@ -146,6 +146,13 @@ class DroneEnv:
         # PX4 requires waiting 2 seconds.
         if toolConfig.MODE == "PX4":
             time.sleep(2)
+
+    def reset(self, delay=True, delete_log=False):
+        """
+        Reset Environment
+        """
+        # flight preparation
+        self.init_drone_env(delete_log)
         # take off
         self.manager.online_mavlink.start_mission()
         # load bin log file
