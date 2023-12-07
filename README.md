@@ -113,10 +113,6 @@ For some rare cases like Example-3, Nyctea may send a configuration causing adve
 The subsequent configurations can still rectify the segment deviation value moderately at the end. 
 Overall, our system reduces the instability of the drone to a reasonable level so that it can accomplish the mission properly.
 
-![PX4](/fig/deviation_change_px4.jpeg)
-
-The PX4 performed similarly to the Ardupilot, 
-and overall, the deviations all tended to decrease after several fixes.
 
 ### 3.Case
 ![Ardupilot](/fig/fix_thrust_roll.jpg)
