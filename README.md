@@ -105,18 +105,12 @@ The log path for PX4 is in `{PX4_Path}/build/px4_sitl_default/logs/`, which is n
 ![Real Drone](/fig/zd500.jpg)
 
 ### 2.Deviation Change Example
-![Ardupilot](/fig/deviation_change.jpeg)
+![Roll](/fig/frozen_states_roll.jpg)
+![Pitch](/fig/frozen_states_pitch.jpg)
+![Yaw](/fig/frozen_states_yaw.jpg)
 
-In most cases, the segment deviations gradually decreased when the new configurations were uploaded and further dropped 
-below the threshold after the first iteration, eventually stabilized at the fourth iteration. 
-For some rare cases like Example-3, Nyctea may send a configuration causing adverse impact at the beginning.
-The subsequent configurations can still rectify the segment deviation value moderately at the end. 
-Overall, our system reduces the instability of the drone to a reasonable level so that it can accomplish the mission properly.
-
-
-### 3.Case
-![Ardupilot](/fig/fix_thrust_roll.jpg)
-
-![Ardupilot](/fig/fix_thrust_pitch.jpg)
-
-![Ardupilot](/fig/fix_thrust_yaw.jpg)
+To better demonstrate the trend in state changes, we illustrate angular changes (i.e., Roll, Pitch, Yaw) of a sample execution with a misconfiguration causing flight hovering in Figure~\ref{fig:frozen_state}.
+It demonstrates that the drone remains stable from 0 $\sim$ 10.3s, i.e., the physical roll, pitch, and yaw of each state remain at a minimal deviation from the desired values.
+At around 10s, we sent a misconfiguration at the first waypoint and then the drone started swaying and deviated from the desired states gradually between 10.4s to 17.1s. 
+During this period, \system aims to eliminate the adverse effect at any timestamp because the drone only started showing potential instability but is still controllable. 
+After 17.2s, the physical states significantly deviated from the desired states, rendering the drone uncontrollable. 
