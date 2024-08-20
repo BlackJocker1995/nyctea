@@ -104,13 +104,3 @@ The log path for PX4 is in `{PX4_Path}/build/px4_sitl_default/logs/`, which is n
 ![Jmavsim](/fig/jmavsim.jpg)
 ![Real Drone](/fig/zd500.jpg)
 
-### 2.Deviation Change Example
-![Roll](/fig/frozen_states_roll.jpg)
-![Pitch](/fig/frozen_states_pitch.jpg)
-![Yaw](/fig/frozen_states_yaw.jpg)
-
-To better demonstrate the trend in state changes, we illustrate angular changes (i.e., Roll, Pitch, Yaw) of a sample execution with a misconfiguration causing flight hovering in Figure~\ref{fig:frozen_state}.
-It demonstrates that the drone remains stable from 0 $\sim$ 10.3s, i.e., the physical roll, pitch, and yaw of each state remain at a minimal deviation from the desired values.
-At around 10s, we sent a misconfiguration at the first waypoint and then the drone started swaying and deviated from the desired states gradually between 10.4s to 17.1s. 
-During this period, \system aims to eliminate the adverse effect at any timestamp because the drone only started showing potential instability but is still controllable. 
-After 17.2s, the physical states significantly deviated from the desired states, rendering the drone uncontrollable. 
