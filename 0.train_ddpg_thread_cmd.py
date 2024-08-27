@@ -18,7 +18,7 @@ from Rl.learning_agent import DDPGAgent
 def run_train(param_file, device):
 
     ddpg_agent = DDPGAgent(device=device)
-    ddpg_agent.train_from_incorrent(param_file)
+    ddpg_agent.train_from_incorrect(param_file)
     ddpg_agent.close()
 
 

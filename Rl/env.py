@@ -46,10 +46,11 @@ class DroneEnv:
         # display debug information
         self.debug = debug
 
-    def get_random_incorrent_configuration(self, param_file, deduplicate=False):
+    def get_random_incorrect_configuration(self, param_file, deduplicate=False):
         """
-        set a random incorrent configuration from ICSearcher
+        set a random incorrect configuration from ICSearcher
         @param deduplicate:
+        @param param_file:
         @return:
         """
         # Read incorrect configuration
@@ -147,9 +148,12 @@ class DroneEnv:
         if toolConfig.MODE == "PX4":
             time.sleep(2)
 
-    def reset(self, delay=True, delete_log=False):
+    def reset(self, delay=True, delete_log=False) -> bool:
         """
         Reset Environment
+        :param delay:
+        :param delete_log: wait a time from [0, 2]
+        :return: True or False
         """
         # flight preparation
         self.init_drone_env(delete_log)

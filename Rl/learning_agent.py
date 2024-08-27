@@ -361,7 +361,7 @@ class DDPGAgent(ReLearningAgent):
 
         logging.info("Load previous model.")
 
-    def train_from_incorrent(self, param_file):
+    def train_from_incorrect(self, param_file):
         run_round = 1
         while True:
             try:
@@ -369,7 +369,7 @@ class DDPGAgent(ReLearningAgent):
                 print("\n--------------------------------------------------------------------------------------\n")
 
                 logging.info("Change configuration.")
-                self.env.get_random_incorrent_configuration(param_file)
+                self.env.get_random_incorrect_configuration(param_file)
                 set_result = self.env.reset(delete_log=True)
                 # reset fault, retry
                 if not set_result:

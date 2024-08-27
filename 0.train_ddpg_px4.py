@@ -18,4 +18,4 @@ if __name__ == "__main__":
         device = 0
     param_file = f"validation/{toolConfig.MODE}/params4.csv"
     ddpg_agent = DDPGAgent(device=device)
-    ddpg_agent.train_from_incorrent(param_file)
+    ddpg_agent.train_from_incorrect(param_file)

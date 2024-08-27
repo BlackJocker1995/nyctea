@@ -18,7 +18,7 @@ def apm_run():
         device = 0
     param_file = f"validation/{toolConfig.MODE}/params.csv"
     ddpg_agent = DDPGAgent(device=device)
-    ddpg_agent.train_from_incorrent(param_file)
+    ddpg_agent.train_from_incorrect(param_file)
     ddpg_agent.close()
 
 

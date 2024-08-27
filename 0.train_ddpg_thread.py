@@ -30,7 +30,7 @@ from Rl.learning_agent import DDPGAgent
 @ray.remote
 def run_train(device):
     ddpg_agent = DDPGAgent(device=device)
-    ddpg_agent.train_from_incorrent()
+    ddpg_agent.train_from_incorrect()
     ddpg_agent.close()
 
 if __name__ == '__main__':
