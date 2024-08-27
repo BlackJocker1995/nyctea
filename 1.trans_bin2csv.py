@@ -7,5 +7,5 @@ from Cptool.boardMavlink import BoardMavlinkAPM
 from Cptool.config import toolConfig
 
 if __name__ == '__main__':
-    BoardMavlinkAPM.extract_log_path(f"{toolConfig.ARDUPILOT_LOG_PATH}/logs/bin_regular", skip=False,
+    BoardMavlinkAPM.extract_log_path(f"{toolConfig.ARDUPILOT_LOG_PATH}/unstable", skip=False,
                                      keep_des=True, thread=6)

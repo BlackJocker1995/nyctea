@@ -16,7 +16,8 @@ from Cptool.simManager import SimManager, FixSimManager
 from Rl.learning_agent import DDPGAgent
 
 if __name__ == '__main__':
-    param_file = f"validation/{toolConfig.MODE}/params.csv"
+    toolConfig.select_mode("Ardupilot")
+    param_file = f"validation/{toolConfig.MODE}/params12.csv"
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     # Device
     parser = argparse.ArgumentParser(description='Personal information')
@@ -46,7 +47,7 @@ if __name__ == '__main__':
             while not os.access(f"validation/{toolConfig.MODE}/params_repair{EXE}.csv", os.R_OK):
                 continue
             data = pd.read_csv(f'validation/{toolConfig.MODE}/params_repair{EXE}.csv')
-            exit_data = data.drop(['repair_result', 'result'], axis=1, inplace=False)
+            exit_data = data.drop(['repair_result', 'result','repair_time', 'hash'], axis=1, inplace=False)
             # If the value has been validate
             if ((exit_data - config).sum(axis=1).abs() < 0.00001).sum() > 0:
                 continue
