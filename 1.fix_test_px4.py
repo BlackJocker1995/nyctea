@@ -17,7 +17,7 @@ from Rl.learning_agent import DDPGAgent
 
 if __name__ == '__main__':
     toolConfig.select_mode("PX4")
-    param_file = f"validation/{toolConfig.MODE}/params.csv"
+    param_file = f"validation/{toolConfig.MODE}/params4.csv"
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     # Device
     parser = argparse.ArgumentParser(description='Personal information')
