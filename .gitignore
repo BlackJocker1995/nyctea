@@ -1,0 +1,4 @@
+# Ignore macOS system files
+._*
+.DS_Store
+*.pkl
