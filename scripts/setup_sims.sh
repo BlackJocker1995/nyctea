@@ -1,0 +1,320 @@
+#!/usr/bin/env bash
+#
+# setup_sims.sh — install the drone simulators nyctea repairs against.
+#
+# nyctea re-flies destabilizing controller configs in real SITL to train and
+# evaluate the DDPG repair agent, so it needs the same simulators ICSearcher
+# fuzzes. This script (a near-verbatim port of ICSearcher's setup_sims.sh)
+# clones the two upstream firmware repositories (ArduPilot and PX4) into the
+# repo, builds their SITL (Software-In-The-Loop) simulators, provisions a
+# flight-log directory, and rewrites data/config.yaml to point at everything.
+#
+# WHAT GETS INSTALLED (all under the repository, so uninstall = delete the dir):
+#
+#   nyctea/
+#   ├── sims/                         SIM_ROOT (created by this script)
+#   │   ├── ardupilot/                ArduPilot SITL source + build
+#   │   ├── PX4-Autopilot/            PX4 source + build + JMavSim
+#   │   └── data/                     DATA_DIR — flight logs live here
+#   ├── data/config.yaml              rewritten with the paths above
+#   └── ...
+#
+# USAGE
+#   ./scripts/setup_sims.sh             # install BOTH simulators (default)
+#   ./scripts/setup_sims.sh --ardupilot # only ArduPilot
+#   ./scripts/setup_sims.sh --px4       # only PX4
+#
+#   # Override where things go (absolute paths recommended):
+#   SIM_ROOT=/opt/sims DATA_DIR=/var/lib/nyctea ./scripts/setup_sims.sh
+#
+#   # Pin a different firmware version (defaults are stable tags):
+#   ARDUPILOT_BRANCH=Copter-4.5.2 PX4_BRANCH=v1.14.0 ./scripts/setup_sims.sh
+#
+# REQUIREMENTS
+#   Ubuntu 20.04 or 22.04, ~10 GB free disk, internet.
+#   System packages (build-essential, git, python3*, ...) installed beforehand
+#   via README §Prerequisites. This script does not use sudo.
+#   The first build downloads a compiler toolchain and is slow (20-60 min).
+#
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Configuration (every path is overridable via an env var)
+# ---------------------------------------------------------------------------
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# SIM_ROOT: where the firmware repos live. Default: inside the repo (sims/), so
+# the whole install is self-contained and removed by `rm -rf sims`.
+SIM_ROOT="${SIM_ROOT:-$REPO_ROOT/sims}"
+ARDUPILOT_DIR="$SIM_ROOT/ardupilot"
+PX4_DIR="$SIM_ROOT/PX4-Autopilot"
+
+# DATA_DIR: where simulated flight logs are written. Default: sims/data.
+# This becomes data/config.yaml's `paths.ardupilot_log` and the parent of the
+# PX4 log path.
+DATA_DIR="${DATA_DIR:-$SIM_ROOT/data}"
+
+# Firmware versions (stable tags). Override with env vars if you need another.
+ARDUPILOT_BRANCH="${ARDUPILOT_BRANCH:-Copter-4.5.2}"
+PX4_BRANCH="${PX4_BRANCH:-v1.14.0}"
+NJOBS="${NJOBS:-$(nproc)}"
+
+# Upstream URLs (the two repos this script downloads).
+ARDUPILOT_URL="https://github.com/ardupilot/ardupilot"
+PX4_URL="https://github.com/PX4/PX4-Autopilot.git"
+
+# Which simulators to install. Default: both.
+INSTALL_ARDUPILOT=1
+INSTALL_PX4=1
+if [[ "${1:-}" == "--ardupilot" ]]; then INSTALL_PX4=0; fi
+if [[ "${1:-}" == "--px4" ]]; then INSTALL_ARDUPILOT=0; fi
+
+# Pretty logging.
+log()  { printf '\n\033[1;34m▶ %s\033[0m\n' "$*"; }
+info() { printf '  \033[0;37m%s\033[0m\n' "$*"; }
+ok()   { printf '  \033[1;32m✓ %s\033[0m\n' "$*"; }
+warn() { printf '  \033[1;33m! %s\033[0m\n' "$*" >&2; }
+die()  { printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# Step 0 — verify system build dependencies (installed by the user, see README)
+# ---------------------------------------------------------------------------
+install_system_deps() {
+    log "Step 0 — checking system build dependencies"
+    info "This script does NOT use sudo. Install the system packages yourself"
+    info "first (see README §Prerequisites), then run this script as your normal user."
+    local missing=()
+    for cmd in git python3 pip3 wget curl ccache make; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing+=("$cmd")
+        fi
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        die "Missing commands: ${missing[*]}.
+  Install them (one-time, needs sudo) — see README §Prerequisites:
+    sudo apt-get update
+    sudo apt-get install -y --no-install-recommends \\
+        git python3 python3-pip python3-dev python3-venv \\
+        build-essential ccache wget curl"
+    fi
+    ok "system build tools present"
+}
+
+# ---------------------------------------------------------------------------
+# Step 1 — ArduPilot SITL
+# ---------------------------------------------------------------------------
+install_ardupilot() {
+    log "Step A — ArduPilot SITL  →  $ARDUPILOT_DIR"
+    info "Cloning $ARDUPILOT_URL (branch $ARDUPILOT_BRANCH)"
+
+    if [[ ! -d "$ARDUPILOT_DIR/.git" ]]; then
+        git clone --recurse-submodules "$ARDUPILOT_URL" "$ARDUPILOT_DIR"
+    else
+        warn "$ARDUPILOT_DIR already exists; reusing and refreshing submodules."
+    fi
+    git -C "$ARDUPILOT_DIR" checkout "$ARDUPILOT_BRANCH"
+    git -C "$ARDUPILOT_DIR" submodule update --init --recursive
+
+    # Patch ArduPilot's bundled waf build system for Python 3.12+.
+    # The bundled waf (modules/waf) still uses the removed `imp` module and the
+    # removed `'rU'` file mode. Provide a lightweight imp.py shim and fix the
+    # text mode. Both changes are idempotent.
+    info "Patching waf for Python 3.12 compatibility..."
+    local waf_parent="$ARDUPILOT_DIR/modules/waf"
+    local waf_dir="$waf_parent/waflib"
+    if [[ -f "$waf_dir/Context.py" ]]; then
+        cat > "$waf_parent/imp.py" << 'IMPSHIM'
+import importlib.util
+import types
+
+def get_suffixes():
+    return importlib.util.EXTENSION_SUFFIXES
+
+def new_module(name):
+    return types.ModuleType(name)
+
+def load_source(name, pathname, file=None):
+    spec = importlib.util.spec_from_file_location(name, pathname)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+# waf 2.x also calls imp.load_source with positional args; keep the signature.
+load_module = load_source
+IMPSHIM
+        sed -i 's/m=.rU./m="r"/g' "$waf_dir/Context.py" "$waf_dir/ConfigSet.py"
+        ok "waf patched for Python 3.12"
+    fi
+
+    local sitl_bin="$ARDUPILOT_DIR/build/sitl/bin/arducopter"
+    if [[ -f "$sitl_bin" ]]; then
+        info "ArduCopter SITL already built at $sitl_bin — skipping build."
+        ok "ArduPilot SITL ready"
+        return
+    fi
+
+    info "Building ArduCopter SITL — first build downloads a toolchain (slow)"
+    info "(ArduPilot's Python tools — MAVProxy, dronekit-sitl, pexpect — come from"
+    info " the project venv via 'uv sync --group ardupilot'; no system pip install.)"
+    # Run sim_vehicle.py inside the project venv so it sees pexpect / pymavlink /
+    # MAVProxy installed there. uv run handles the interpreter + PYTHONPATH.
+    ( cd "$ARDUPILOT_DIR" && \
+      uv run --project "$REPO_ROOT" python "Tools/autotest/sim_vehicle.py" \
+          -v ArduCopter -w -j"$NJOBS" )
+
+    ok "ArduPilot SITL ready: $ARDUPILOT_DIR/Tools/autotest/sim_vehicle.py"
+}
+
+# ---------------------------------------------------------------------------
+# Step 2 — PX4-Autopilot + JMavSim
+# ---------------------------------------------------------------------------
+install_px4() {
+    log "Step B — PX4-Autopilot + JMavSim  →  $PX4_DIR"
+    info "Cloning $PX4_URL (tag $PX4_BRANCH)"
+
+    if [[ ! -d "$PX4_DIR/.git" ]]; then
+        git clone --recursive "$PX4_URL" "$PX4_DIR"
+    else
+        warn "$PX4_DIR already exists; reusing and refreshing submodules."
+    fi
+    git -C "$PX4_DIR" checkout "$PX4_BRANCH"
+    git -C "$PX4_DIR" submodule update --init --recursive
+
+    local px4_bin="$PX4_DIR/build/px4_sitl_default/bin/px4"
+    if [[ -f "$px4_bin" ]]; then
+        info "PX4 SITL already built at $px4_bin — skipping build."
+    else
+        info "Pre-building PX4 SITL + JMavSim so the first repair run is fast"
+        ( cd "$PX4_DIR" && HEADLESS=1 make px4_sitl jmavsim ) || true
+        # The build spawns a jmavsim process; stop it, the binaries are already built.
+        pkill -f "jmavsim_run.sh" 2>/dev/null || true
+        pkill -f "px4 -i" 2>/dev/null || true
+    fi
+
+    # PX4 needs a per-instance launcher for multi-SITL repair/training.
+    provision_px4_multi_instance_helper
+
+    ok "PX4 SITL ready: $PX4_DIR (JMavSim: $PX4_DIR/Tools/jmavsim_run.sh)"
+}
+
+provision_px4_multi_instance_helper() {
+    # nyctea's multi-instance training calls Tools/sitl_multiple_run_single.sh,
+    # which upstream no longer ships. Recreate it so `--instances N` works.
+    local target="$PX4_DIR/Tools/sitl_multiple_run_single.sh"
+    info "Writing PX4 multi-instance launcher: $target"
+    cat > "$target" <<'HELPER'
+#!/bin/bash
+# Launch a single PX4 SITL instance by index. Created by nyctea's setup_sims.sh.
+sitl_num=0
+[ -n "$1" ] && sitl_num="$1"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+build_path="${SCRIPT_DIR}/../build/px4_sitl_default"
+pkill -f "px4 -i $sitl_num" 2>/dev/null || true
+sleep 1
+export PX4_SIM_MODEL=iris
+working_dir="$build_path/instance_$sitl_num"
+mkdir -p "$working_dir"
+cd "$working_dir"
+echo "starting PX4 SITL instance $sitl_num in $(pwd)"
+"$build_path/bin/px4" -i "$sitl_num" -d "$build_path/etc" -s etc/init.d-posix/rcS
+HELPER
+    chmod +x "$target"
+}
+
+# ---------------------------------------------------------------------------
+# Step 3 — data storage directory + wire up config.yaml
+# ---------------------------------------------------------------------------
+setup_data_dir() {
+    log "Step C — flight-log storage  →  $DATA_DIR"
+    info "All simulated flight logs (.BIN / .ulg) and the ArduPilot LASTLOG.TXT"
+    info "index live here. Keeping them under SIM_ROOT makes cleanup trivial."
+    mkdir -p "$DATA_DIR/logs"
+
+    # ArduPilot tracks the next log number in logs/LASTLOG.TXT; create it so the
+    # collect/train stage works on the very first run.
+    if [[ ! -f "$DATA_DIR/logs/LASTLOG.TXT" ]]; then
+        echo '0' > "$DATA_DIR/logs/LASTLOG.TXT"
+    fi
+    ok "data directory ready: $DATA_DIR"
+}
+
+update_config() {
+    # Generate data/config.yaml from the example template, then rewrite the
+    # paths: block to point at the just-installed locations.
+    local cfg="$REPO_ROOT/data/config.yaml"
+    local example="$REPO_ROOT/data/config.yaml.example"
+
+    if [[ ! -f "$cfg" ]]; then
+        if [[ -f "$example" ]]; then
+            cp "$example" "$cfg"
+            log "Step D — generating data/config.yaml from config.yaml.example"
+        else
+            warn "No config.yaml or example found; skipping config update."
+            return
+        fi
+    fi
+
+    log "Step D — wiring data/config.yaml to the installed paths"
+    python3 - "$cfg" "$ARDUPILOT_DIR" "$PX4_DIR" "$DATA_DIR" <<'PY'
+import re, sys
+cfg, ardupilot_dir, px4_dir, data_dir = sys.argv[1:5]
+sitl = f"{ardupilot_dir}/Tools/autotest/sim_vehicle.py"
+jmavsim = f"{px4_dir}/Tools/jmavsim_run.sh"
+morse = f"{ardupilot_dir}/libraries/SITL/examples/Morse/quadcopter.py"
+
+text = open(cfg).read()
+# nyctea's config.yaml paths: block uses the same field names as ICSearcher.
+repls = {
+    r"(?m)^(\s*ardupilot_log:\s*).*": rf"\g<1>{data_dir}",
+    r"(?m)^(\s*sitl:\s*).*":          rf"\g<1>{sitl}",
+    r"(?m)^(\s*px4_run:\s*).*":       rf"\g<1>{px4_dir}",
+    r"(?m)^(\s*jmavsim:\s*).*":       rf"\g<1>{jmavsim}",
+    r"(?m)^(\s*morse:\s*).*":         rf"\g<1>{morse}",
+}
+for pat, rep in repls.items():
+    text = re.sub(pat, rep, text)
+open(cfg, "w").write(text)
+print(f"  updated {cfg}")
+PY
+    ok "config.yaml paths updated"
+}
+
+# ---------------------------------------------------------------------------
+# Driver
+# ---------------------------------------------------------------------------
+main() {
+    log "nyctea simulator installer"
+    info "SIM_ROOT     = $SIM_ROOT   (firmware repos go here)"
+    info "DATA_DIR     = $DATA_DIR   (flight logs go here)"
+    info "ArduPilot    = $ARDUPILOT_URL @ $ARDUPILOT_BRANCH"
+    info "PX4          = $PX4_URL @ $PX4_BRANCH"
+    echo
+
+    mkdir -p "$SIM_ROOT"
+    install_system_deps
+
+    (( INSTALL_ARDUPILOT )) && install_ardupilot
+    (( INSTALL_PX4 ))       && install_px4
+
+    setup_data_dir
+    update_config
+
+    cat <<SUMMARY
+
+$(printf '\033[1;32m✓ Installation complete.\033[0m')
+
+What was installed (all under $SIM_ROOT — remove with 'rm -rf $SIM_ROOT'):
+  ArduPilot SITL : $ARDUPILOT_DIR
+  PX4 + JMavSim  : $PX4_DIR
+  Flight logs    : $DATA_DIR            (also written into data/config.yaml)
+
+Your data/config.yaml 'paths:' block now points at these locations, so you can
+run the pipeline immediately. To switch firmware, edit 'mode:' in
+data/config.yaml (PX4 or Ardupilot) or set NYCTEA_MODE.
+
+Next:
+  uv run nyctea-collect   # stage 1 — start collecting RL transitions
+SUMMARY
+}
+
+main "$@"

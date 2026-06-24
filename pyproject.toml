@@ -5,44 +5,82 @@ build-backend = "hatchling.build"
 [project]
 name = "nyctea"
 version = "0.2.0"
-description = "A reinforcement learning based drone attitude correction framework supporting both Ardupilot and PX4 flight control systems."
+description = "A reinforcement-learning drone attitude-correction framework that repairs destabilizing UAV controller configs (ArduPilot / PX4)."
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.10"
-authors = [
-    { name = "rain" },
-]
+authors = [{ name = "rain", email = "rain@users.noreply.github.com" }]
+requires-python = ">=3.9,<3.12"
+
+# All runtime dependencies. `torch` here is the PyPI wheel (CPU by default).
+# For an NVIDIA GPU build, see the CUDA note in README §1 — install the CUDA
+# wheel manually after `uv sync` (uv does not support per-build source routing
+# in a single manifest cleanly).
 dependencies = [
-    "numpy",
-    "scipy",
-    "pandas",
-    "torch",
-    "pymoo",
-    "pexpect",
-    "loguru",
-    "pyyaml",
-    "matplotlib",
-    "psutil",
-    "scikit-learn",
-    "pymavlink",
-    "requests",
+    "numpy>=1.24,<2.0",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "scikit-learn>=1.2",
+    "matplotlib>=3.6",
+    "pymavlink>=2.4",
+    "pyulog>=1.0",
+    "pexpect>=4.8",
+    "eventlet>=0.33",
+    "pyyaml>=6.0",
+    "loguru>=0.7",
+    "tqdm>=4.65",
+    "psutil>=5.9",
+    "requests>=2.28",
+    # pymoo is used by ICSearcher; kept here so a shared analysis env resolves.
+    "pymoo>=0.6",
+    # RL model backend. CPU wheel from PyPI; swap for CUDA after install.
+    "torch>=2.1",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-]
-
+# Console entry points: run each pipeline stage as `uv run nyctea-<stage>`
+# (no `python`, no path). Installed automatically by `uv sync`.
 [project.scripts]
-# Five-stage pipeline entry points, dispatched by pipelines/__main__.py.
-nyctea-collect = "pipelines.__main__:collect_main"
-nyctea-train = "pipelines.__main__:train_main"
-nyctea-repair = "pipelines.__main__:repair_main"
+nyctea-collect  = "pipelines.__main__:collect_main"
+nyctea-train    = "pipelines.__main__:train_main"
+nyctea-repair   = "pipelines.__main__:repair_main"
 nyctea-validate = "pipelines.__main__:validate_main"
-nyctea-analyze = "pipelines.__main__:analyze_main"
+nyctea-analyze  = "pipelines.__main__:analyze_main"
 
+[dependency-groups]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.1",
+    "black>=23.10",
+]
+# ArduPilot build/runtime tools (sim_vehicle.py, MAVProxy, dronekit-sitl).
+# Install with:  uv sync --group ardupilot
+# PX4-only users can skip this group. pymavlink + pexpect are already main deps.
+ardupilot = [
+    "MAVProxy>=1.8",
+    "dronekit>=2.9",
+    "dronekit-sitl>=3.3",
+    "future>=1.0",
+    "empy==3.3.4",
+]
+
+# Tell hatchling which packages to ship (so the entry points resolve).
 [tool.hatch.build.targets.wheel]
 packages = ["nyctea", "pipelines"]
 
+# ---------------------------------------------------------------------------
+# Tool config
+# ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
+minversion = "7.4"
 testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra -q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+extend-exclude = ["model", "validation", "csv_data", "fig", "sims"]
+
+[tool.black]
+line-length = 120
+target-version = ["py39", "py310", "py311"]
