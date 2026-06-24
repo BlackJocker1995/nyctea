@@ -24,14 +24,15 @@ simulation:
     limit_low: 40
 
 paths:
-  # Simulator locations. Defaults point at home-directory builds from the
-  # template; run scripts/setup_sims.sh (or place them under sims/) and
-  # _detect_sims() will redirect to those if the path below is missing.
-  ardupilot_log: /media/rain/data
-  sitl: /home/rain/ardupilot/Tools/autotest/sim_vehicle.py
-  px4_run: /home/rain/PX4-Autopilot
-  jmavsim: /home/rain/PX4-Autopilot/Tools/jmavsim_run.sh
-  morse: /home/rain/ardupilot/libraries/SITL/examples/Morse/quadcopter.py
+  # Simulator locations, relative to the repo root. setup_sims.sh clones+builds
+  # them under sims/; config.resolve() turns these into absolute paths and
+  # _detect_sims() falls back to sims/<name> if a path is missing. To use an
+  # external build, set an absolute path here.
+  ardupilot_log: sims/data
+  sitl: sims/ardupilot/Tools/autotest/sim_vehicle.py
+  px4_run: sims/PX4-Autopilot
+  jmavsim: sims/PX4-Autopilot/Tools/jmavsim_run.sh
+  morse: sims/ardupilot/libraries/SITL/examples/Morse/quadcopter.py
 
   # Where ICSearcher's validate stage writes its params{EXE}.csv (the
   # destabilizing configs that feed nyctea's collect/repair stages).
