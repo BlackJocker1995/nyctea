@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nyctea"
+version = "0.2.0"
+description = "A reinforcement learning based drone attitude correction framework supporting both Ardupilot and PX4 flight control systems."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    { name = "rain" },
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "torch",
+    "pymoo",
+    "pexpect",
+    "loguru",
+    "pyyaml",
+    "matplotlib",
+    "psutil",
+    "scikit-learn",
+    "pymavlink",
+    "requests",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+# Five-stage pipeline entry points, dispatched by pipelines/__main__.py.
+nyctea-collect = "pipelines.__main__:collect_main"
+nyctea-train = "pipelines.__main__:train_main"
+nyctea-repair = "pipelines.__main__:repair_main"
+nyctea-validate = "pipelines.__main__:validate_main"
+nyctea-analyze = "pipelines.__main__:analyze_main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nyctea", "pipelines"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

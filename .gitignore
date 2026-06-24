@@ -1,4 +1,23 @@
 # Ignore macOS system files
 ._*
 .DS_Store
-*.pkl
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Machine-specific config (generated from .example on first run)
+data/config.yaml
+
+# RL artefacts (checkpoints, buffer shards, per-config deviation npz)
+model/
+validation/
+csv_data/
+
+# Buffer / lock files
+*.lock
+*.tmp
+*.tmp.npz
