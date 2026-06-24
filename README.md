@@ -322,9 +322,3 @@ collide.
 through `nyctea/logging_config.py`. `setup_logging(debug=...)` configures one
 unified stderr sink and bridges any remaining stdlib `logging` calls into it,
 so nothing is silenced.
-
-## Experimental Setup
-
-![APM](/fig/airsim.png)
-![Jmavsim](/fig/jmavsim.jpg)
-![Real Drone](/fig/zd500.jpg)
