@@ -9,8 +9,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 
-# Machine-specific config (generated from .example on first run)
-data/config.yaml
+# config.yaml holds the default local simulator paths and is committed so the
+# pipeline works out of the box; override per-machine with env vars or by
+# editing it locally.
+# data/config.yaml  (intentionally tracked — see above)
 
 # RL artefacts (checkpoints, buffer shards, per-config deviation npz)
 model/

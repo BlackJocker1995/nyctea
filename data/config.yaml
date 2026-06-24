@@ -1,0 +1,64 @@
+# nyctea configuration.
+#
+# Copy this file to config.yaml and edit for your machine. The single source of
+# truth for the whole pipeline; resolved once at import time (frozen after that).
+#
+# Override precedence for the magic fields: CLI flag > env var > yaml > default.
+#   mode              -> NYCTEA_MODE            (Ardupilot | PX4)
+#   instances         -> NYCTEA_INSTANCES       (int >= 1)
+#   debug             -> NYCTEA_DEBUG           (1/true/yes)
+#   icsearcher_result -> NYCTEA_ICSEARCHER_RESULT (path)
+
+mode: Ardupilot
+
+simulation:
+  speed: 3
+  home: AVC_plane        # null for default home, "AVC_plane" for the AVC mission
+  debug: true
+  wind_range: [8, 10.7]
+  window:
+    width: 640
+    height: 480
+  altitude:
+    limit_high: 50
+    limit_low: 40
+
+paths:
+  # Simulator locations. Defaults point at home-directory builds from the
+  # template; run scripts/setup_sims.sh (or place them under sims/) and
+  # _detect_sims() will redirect to those if the path below is missing.
+  ardupilot_log: /media/rain/data
+  sitl: /home/rain/ardupilot/Tools/autotest/sim_vehicle.py
+  px4_run: /home/rain/PX4-Autopilot
+  jmavsim: /home/rain/PX4-Autopilot/Tools/jmavsim_run.sh
+  morse: /home/rain/ardupilot/libraries/SITL/examples/Morse/quadcopter.py
+
+  # Where ICSearcher's validate stage writes its params{EXE}.csv (the
+  # destabilizing configs that feed nyctea's collect/repair stages).
+  icsearcher_result: ../ICSearcher/result
+
+  # RL artefact directories (checkpoints + replay buffer shards). Defaults are
+  # relative to the repo root; override to point at a data volume for large runs.
+  model_dir: model
+  buffer_dir: model/buffer
+
+model:
+  # DDPG network hidden width.
+  hidden: 256
+  # Replay buffer capacity (number of transitions kept in memory for sampling).
+  capacity: 10000
+  batch_size: 64
+
+parallel:
+  # Number of concurrent simulator instances during collect/train/repair.
+  instances: 1
+  instance_dir: instance_{i}
+
+param_files:
+  ardupilot: data/param_ardu.json
+  px4: data/param_px4.json
+
+missions:
+  fit_collection:
+    ardupilot: data/fitCollection.txt
+    px4: data/fitCollection_px4.txt
